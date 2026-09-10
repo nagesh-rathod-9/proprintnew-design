@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
-import { 
-  CategoryId, 
+import {
+  CategoryId,
   Category,
-  Product, 
-  CartItem, 
-  SelectedProductCustomization, 
-  Order, 
-  QuoteRequest, 
+  Product,
+  CartItem,
+  SelectedProductCustomization,
+  Order,
+  QuoteRequest,
   User,
   UserAddress,
   PaymentRecord,
@@ -22,67 +22,138 @@ import { App } from '@capacitor/app';
 import { db } from '../firebase';
 import { collection, doc, setDoc, getDocs, deleteDoc } from 'firebase/firestore';
 
-// Set VITE_API_ORIGIN for Capacitor builds (for example, https://api.example.com).
-// Android emulator development can use http://10.0.2.2:3000.
-const LOCAL_SERVER_ORIGIN = import.meta.env.VITE_API_ORIGIN || (Capacitor.isNativePlatform() ? 'http://10.0.2.2:3000' : 'http://localhost:3000');
+
+const ORACLE_SERVER_ORIGIN = 'http://140.238.167.184:3000';
+
+const LOCAL_SERVER_ORIGIN = String(
+  import.meta.env.VITE_API_ORIGIN || ORACLE_SERVER_ORIGIN
+).replace(/\/+$/, '');
+
 const API_BASE_URL = `${LOCAL_SERVER_ORIGIN}/api`;
 
-// ================================================================
-// Helper: Convert relative image URL to absolute
-// ================================================================
-export const getFullImageUrl = (url: string | undefined | null): string => {
+/**
+ * Convert any known old/local upload URL into the current relative
+ * backend path before saving it to the database.
+ *
+ * Database format:
+ *   /uploads/example.webp
+ *
+ * Never store:
+ *   http://localhost:3000/uploads/...
+ *   http://10.0.2.2:3000/uploads/...
+ *   http://140.238.167.184:3000/uploads/...
+ */
+export const normalizeImageUrlForApi = (
+  url: string | undefined | null
+): string => {
   if (!url) return '';
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  // If it starts with '/', prepend the local server; otherwise add leading slash.
-  return url.startsWith('/') ? `${LOCAL_SERVER_ORIGIN}${url}` : `${LOCAL_SERVER_ORIGIN}/${url}`;
+
+  const value = String(url).trim();
+  if (!value) return '';
+
+  // Convert known local/backend upload URLs to relative paths.
+  const knownUploadHosts = [
+    /^https?:\/\/localhost(?::\d+)?(\/uploads\/.*)$/i,
+    /^https?:\/\/127\.0\.0\.1(?::\d+)?(\/uploads\/.*)$/i,
+    /^https?:\/\/10\.0\.2\.2(?::\d+)?(\/uploads\/.*)$/i,
+    /^https?:\/\/140\.238\.167\.184(?::\d+)?(\/uploads\/.*)$/i
+  ];
+
+  for (const pattern of knownUploadHosts) {
+    const match = value.match(pattern);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  // Any other absolute URL is an intentional external URL.
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  return value.startsWith('/') ? value : `/${value}`;
+};
+
+/**
+ * Convert a stored relative image path into a URL that can be loaded
+ * by both the web application and Capacitor.
+ *
+ * Old localhost / emulator URLs are also repaired here so existing
+ * database records continue to display correctly.
+ */
+export const getFullImageUrl = (
+  url: string | undefined | null
+): string => {
+  if (!url) return '';
+
+  const value = String(url).trim();
+  if (!value) return '';
+
+  // Repair old known backend URLs instead of returning them unchanged.
+  const knownUploadPatterns = [
+    /^https?:\/\/localhost(?::\d+)?(\/uploads\/.*)$/i,
+    /^https?:\/\/127\.0\.0\.1(?::\d+)?(\/uploads\/.*)$/i,
+    /^https?:\/\/10\.0\.2\.2(?::\d+)?(\/uploads\/.*)$/i,
+    /^https?:\/\/140\.238\.167\.184(?::\d+)?(\/uploads\/.*)$/i
+  ];
+
+  for (const pattern of knownUploadPatterns) {
+    const match = value.match(pattern);
+    if (match?.[1]) {
+      return `${LOCAL_SERVER_ORIGIN}${match[1]}`;
+    }
+  }
+
+  // Keep intentional external URLs unchanged.
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  const relativePath = value.startsWith('/') ? value : `/${value}`;
+  return `${LOCAL_SERVER_ORIGIN}${relativePath}`;
 };
 
 // ================================================================
-// FIXED apiFetch – adds cache‑busting for all platforms
+// API fetch helper
 // ================================================================
-export const apiFetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+
+export const apiFetch = (
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<Response> => {
   let url = typeof input === 'string' ? input : input.toString();
 
-  // Handle relative /api paths
-  const isRelativeApi = url.startsWith('/api');
-
-  // For Capacitor native, we must use the absolute URL and add cache‑busting
-  if (Capacitor.isNativePlatform()) {
-    if (isRelativeApi) {
-      const apiPath = url.slice('/api'.length);
-      url = `${API_BASE_URL}${apiPath}`;
-    }
-
-    // Append unique timestamp to force fresh fetch
-    const separator = url.includes('?') ? '&' : '?';
-    url = url.replace(/[&?]_t=\d+/, '');  // remove any existing _t
-    url += `${separator}_t=${Date.now()}`;
-
-    // Set no-cache headers
-    const headers = new Headers(init?.headers || {});
-    const token = localStorage.getItem('proprint_auth_token');
-    if (token) headers.set('Authorization', `Bearer ${token}`);
-    headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-    headers.set('Pragma', 'no-cache');
-    headers.set('Expires', '0');
-
-    return fetch(url, { ...init, headers });
+  // Always route relative API calls to the configured Oracle/backend
+  // origin. This is important when the frontend is hosted on Vercel
+  // and the API is hosted separately on Oracle Cloud.
+  if (url.startsWith('/api')) {
+    const apiPath = url.slice('/api'.length);
+    url = `${API_BASE_URL}${apiPath}`;
   }
 
-  // Web platform – also add cache‑busting to be safe
-  if (isRelativeApi) {
-    const separator = url.includes('?') ? '&' : '?';
-    url = url.replace(/[&?]_t=\d+/, '');
-    url += `${separator}_t=${Date.now()}`;
-  }
+  // Cache-bust every API request so WebView/browser does not keep stale
+  // product/banner data after an update.
+  url = url.replace(/([?&])_t=\d+/g, '');
+  url = url.replace(/[?&]+$/, '');
+
+  const separator = url.includes('?') ? '&' : '?';
+  url += `${separator}_t=${Date.now()}`;
+
   const headers = new Headers(init?.headers || {});
+
   const token = localStorage.getItem('proprint_auth_token');
-  if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
   headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   headers.set('Pragma', 'no-cache');
   headers.set('Expires', '0');
 
-  return fetch(url, { ...init, headers });
+  return fetch(url, {
+    ...init,
+    headers
+  });
 };
 
 // ================================================================
@@ -446,21 +517,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setToast(null);
   };
 
-  useEffect(() => {
-    [
-      'proprint_products',
-      'proprint_categories',
-      'proprint_hero_slides',
-      'proprint_services',
-      'proprint_portfolio',
-      'proprint_users',
-      'proprint_payments',
-      'proprint_reviews',
-      'proprint_orders',
-      'proprint_quotes'
-    ].forEach((key) => localStorage.removeItem(key));
-  }, []);
-
   // Sync to localStorage
   useEffect(() => {
     localStorage.setItem('proprint_cart', JSON.stringify(cartItems));
@@ -479,29 +535,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [currentUser]);
 
   // ================================================================
-  // Helper to transform image URLs in an object
+  // Helper to transform image URLs for display
   // ================================================================
   const transformImageUrls = <T extends Record<string, any>>(item: T): T => {
     const result: any = { ...item };
-    // For Product
-    if (result.image) {
+
+    if (typeof result.image === 'string' && result.image.trim()) {
       result.image = getFullImageUrl(result.image);
     }
-    if (result.galleryImages && Array.isArray(result.galleryImages)) {
-      result.galleryImages = result.galleryImages.map((img: string) => getFullImageUrl(img));
+
+    if (Array.isArray(result.galleryImages)) {
+      result.galleryImages = result.galleryImages.map((img: string) =>
+        getFullImageUrl(img)
+      );
     }
-    // For Category
-    if (result.image && typeof result.image === 'string') {
-      result.image = getFullImageUrl(result.image);
-    }
-    // For HeroSlide
-    if (result.image) {
-      result.image = getFullImageUrl(result.image);
-    }
-    // For PortfolioItem
-    if (result.image) {
-      result.image = getFullImageUrl(result.image);
-    }
+
     return result as T;
   };
 
@@ -527,7 +575,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 setCurrentUser(matched);
                 localStorage.setItem('proprint_user', JSON.stringify(matched));
               }
-            } catch (_e) {}
+            } catch (_e) { }
           }
         }
       }
@@ -679,11 +727,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // ================================================================
   const addProduct = (prodData: Partial<Product>): Product => {
     const newId = prodData.id || `prod-${Date.now()}`;
-    // When adding, we assume the image is either a full URL or relative.
-    // We'll store it as provided (backend will handle it). But for local state,
-    // we transform to absolute if needed.
-    const imageUrl = prodData.image ? getFullImageUrl(prodData.image) : 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80';
-    const galleryUrls = prodData.galleryImages?.map(img => getFullImageUrl(img)) || [imageUrl];
+
+    const imagePath = prodData.image
+      ? normalizeImageUrlForApi(prodData.image)
+      : '';
+
+    const displayImage = imagePath
+      ? getFullImageUrl(imagePath)
+      : 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80';
+
+    const galleryPaths = Array.isArray(prodData.galleryImages)
+      ? prodData.galleryImages
+          .map(normalizeImageUrlForApi)
+          .filter(Boolean)
+      : [];
+
+    const displayGallery = galleryPaths.length > 0
+      ? galleryPaths.map(getFullImageUrl)
+      : [displayImage];
 
     const newProduct: Product = {
       id: newId,
@@ -692,125 +753,418 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       categoryId: (prodData.categoryId as CategoryId) || 'business-cards',
       category: prodData.category || 'Business Cards',
       basePrice: Number(prodData.basePrice) || 299,
-      originalPrice: prodData.originalPrice || Math.round((Number(prodData.basePrice) || 299) * 1.3),
-      description: prodData.description || 'High quality professional printing with premium finish and vivid CMYK color fidelity.',
-      descriptionMr: prodData.descriptionMr || 'उत्कृष्ट फिनिशिंग व अचूक रंगांसह व्यावसायिक प्रिंटिंग.',
-      image: imageUrl,
-      galleryImages: galleryUrls,
+      originalPrice:
+        prodData.originalPrice ||
+        Math.round((Number(prodData.basePrice) || 299) * 1.3),
+      description:
+        prodData.description ||
+        'High quality professional printing with premium finish and vivid CMYK color fidelity.',
+      descriptionMr:
+        prodData.descriptionMr ||
+        'उत्कृष्ट फिनिशिंग व अचूक रंगांसह व्यावसायिक प्रिंटिंग.',
+      image: displayImage,
+      galleryImages: displayGallery,
       rating: prodData.rating || 4.9,
       reviewsCount: prodData.reviewsCount || 1,
       minQuantity: prodData.minQuantity || 100,
       defaultQuantity: prodData.defaultQuantity || 500,
-      quantityOptions: prodData.quantityOptions || [100, 250, 500, 1000, 2000, 5000],
-      sizes: prodData.sizes || [{ id: 'std', name: 'Standard (89mm x 51mm)', priceMultiplier: 1.0 }],
-      finishes: prodData.finishes || [
-        { id: 'matte', name: '350 GSM Velvet Matte', priceMultiplier: 1.0 },
-        { id: 'gloss', name: '350 GSM Gloss Lamination', priceMultiplier: 1.1 },
-        { id: 'uv', name: 'Spot UV + Gold Foil', priceMultiplier: 1.4 }
-      ],
-      features: prodData.features || ['CMYK 4-Color Heidelberg Press', 'Tear & Moisture Resistant', 'Same-Day Dispatch Ready'],
+      quantityOptions:
+        prodData.quantityOptions || [100, 250, 500, 1000, 2000, 5000],
+      sizes:
+        prodData.sizes || [
+          {
+            id: 'std',
+            name: 'Standard (89mm x 51mm)',
+            priceMultiplier: 1.0
+          }
+        ],
+      finishes:
+        prodData.finishes || [
+          {
+            id: 'matte',
+            name: '350 GSM Velvet Matte',
+            priceMultiplier: 1.0
+          },
+          {
+            id: 'gloss',
+            name: '350 GSM Gloss Lamination',
+            priceMultiplier: 1.1
+          },
+          {
+            id: 'uv',
+            name: 'Spot UV + Gold Foil',
+            priceMultiplier: 1.4
+          }
+        ],
+      features:
+        prodData.features || [
+          'CMYK 4-Color Heidelberg Press',
+          'Tear & Moisture Resistant',
+          'Same-Day Dispatch Ready'
+        ],
       tags: prodData.tags || ['Popular', 'Offset', 'Express'],
       turnaroundDays: prodData.turnaroundDays || 1,
-      isPopular: prodData.isPopular !== undefined ? prodData.isPopular : true,
-      isBestSeller: prodData.isBestSeller !== undefined ? prodData.isBestSeller : true
+      isPopular:
+        prodData.isPopular !== undefined ? prodData.isPopular : true,
+      isBestSeller:
+        prodData.isBestSeller !== undefined ? prodData.isBestSeller : true
     };
 
-    setProducts((prev) => [newProduct, ...prev]);
-    // Send to backend with the original relative path (backend should store as is)
-    const payload = { ...newProduct };
-    // But we have transformed to absolute; we need to send back the relative? 
-    // Actually the backend expects the image path as relative; we can extract the relative part.
-    // For simplicity, we send the absolute URL; the backend may store it as is.
-    apiFetch('/api/products', {
+    setProducts(prev => [newProduct, ...prev]);
+
+    const payload = {
+      ...newProduct,
+      image: imagePath || '',
+      galleryImages:
+        galleryPaths.length > 0 ? galleryPaths : imagePath ? [imagePath] : []
+    };
+
+    void apiFetch('/api/products', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
-    }).catch(err => console.warn('Product API sync error:', err));
+    })
+      .then(async res => {
+        if (!res.ok) {
+          let message = 'Failed to create product';
+          try {
+            const data = await res.json();
+            message = data?.error || data?.message || message;
+          } catch {
+            // Ignore non-JSON error responses.
+          }
+          throw new Error(message);
+        }
+      })
+      .catch(err => {
+        console.error('Product create API error:', err);
+        setProducts(prev => prev.filter(p => p.id !== newProduct.id));
+        showToast(
+          err instanceof Error ? err.message : 'Failed to create product',
+          'error'
+        );
+      });
 
-    showToast(`✅ Product "${newProduct.name}" published successfully!`, 'success');
+    showToast(
+      `Product "${newProduct.name}" published successfully!`,
+      'success'
+    );
+
     return newProduct;
   };
 
-  const updateProduct = (productId: string, updatedData: Partial<Product>) => {
-    // Transform any new image URLs
-    const transformedData = { ...updatedData };
-    if (updatedData.image) {
-      transformedData.image = getFullImageUrl(updatedData.image);
-    }
-    if (updatedData.galleryImages) {
-      transformedData.galleryImages = updatedData.galleryImages.map(img => getFullImageUrl(img));
-    }
+  const updateProduct = async (
+    productId: string,
+    updatedData: Partial<Product>
+  ): Promise<boolean> => {
+    const apiData: Partial<Product> = {
+      ...updatedData,
+      ...(updatedData.image !== undefined
+        ? { image: normalizeImageUrlForApi(updatedData.image) }
+        : {}),
+      ...(updatedData.galleryImages !== undefined
+        ? {
+            galleryImages: updatedData.galleryImages
+              .map(normalizeImageUrlForApi)
+              .filter(Boolean)
+          }
+        : {})
+    };
 
-    setProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, ...transformedData } : p))
-    );
-    apiFetch(`/api/products/${productId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedData) // send original data (maybe relative) to backend
-    }).catch(err => console.warn('Product update API sync error:', err));
+    try {
+      const res = await apiFetch(`/api/products/${productId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(apiData)
+      });
 
-    showToast('Product details updated successfully!', 'success');
+      if (!res.ok) {
+        let message = 'Failed to update product';
+
+        try {
+          const data = await res.json();
+          message = data?.error || data?.message || message;
+        } catch {
+          // Ignore invalid error JSON.
+        }
+
+        throw new Error(message);
+      }
+
+      let responseProduct: Partial<Product> | null = null;
+
+      try {
+        const data = await res.json();
+        responseProduct =
+          data?.product ||
+          data?.item ||
+          data?.data ||
+          null;
+      } catch {
+        // Some APIs return an empty successful response.
+      }
+
+      const sourceData = responseProduct || updatedData;
+
+      const displayData: Partial<Product> = {
+        ...sourceData,
+        ...(sourceData.image !== undefined
+          ? { image: getFullImageUrl(sourceData.image) }
+          : {}),
+        ...(sourceData.galleryImages !== undefined
+          ? {
+              galleryImages: sourceData.galleryImages.map(getFullImageUrl)
+            }
+          : {})
+      };
+
+      setProducts(prev =>
+        prev.map(product =>
+          product.id === productId
+            ? { ...product, ...displayData }
+            : product
+        )
+      );
+
+      showToast(
+        'Product details updated successfully!',
+        'success'
+      );
+
+      return true;
+    } catch (err) {
+      console.error('Product update API error:', err);
+
+      showToast(
+        err instanceof Error
+          ? err.message
+          : 'Failed to update product',
+        'error'
+      );
+
+      return false;
+    }
   };
 
-  const deleteProduct = (productId: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== productId));
-    apiFetch(`/api/products/${productId}`, {
-      method: 'DELETE'
-    }).catch(err => console.warn('Product delete API sync error:', err));
+  const deleteProduct = async (productId: string): Promise<void> => {
+    try {
+      const res = await apiFetch(`/api/products/${productId}`, {
+        method: 'DELETE'
+      });
 
-    showToast('Product deleted from inventory.', 'info');
+      if (!res.ok) {
+        let message = 'Failed to delete product';
+
+        try {
+          const data = await res.json();
+          message = data?.error || data?.message || message;
+        } catch {
+          // Ignore invalid error JSON.
+        }
+
+        throw new Error(message);
+      }
+
+      setProducts(prev =>
+        prev.filter(product => product.id !== productId)
+      );
+
+      showToast('Product deleted from inventory.', 'info');
+    } catch (err) {
+      console.error('Product delete API error:', err);
+
+      showToast(
+        err instanceof Error
+          ? err.message
+          : 'Failed to delete product',
+        'error'
+      );
+    }
   };
 
   // Category CRUD – with image transformation
   const addCategory = (catData: Partial<Category>) => {
-    const newId = (catData.id as CategoryId) || `cat-${Date.now()}` as CategoryId;
-    const imageUrl = catData.image ? getFullImageUrl(catData.image) : 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80';
+    const newId =
+      (catData.id as CategoryId) ||
+      (`cat-${Date.now()}` as CategoryId);
+
+    const imagePath = catData.image
+      ? normalizeImageUrlForApi(catData.image)
+      : '';
+
+    const displayImage = imagePath
+      ? getFullImageUrl(imagePath)
+      : 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80';
+
     const newCat: Category = {
       id: newId,
       name: catData.name || 'New Category',
       nameMr: catData.nameMr || catData.name || 'नवीन वर्गवारी',
       shortName: catData.shortName || catData.name || 'Category',
       iconName: catData.iconName || 'Package',
-      image: imageUrl,
+      image: displayImage,
       itemCount: catData.itemCount || 0,
-      featured: catData.featured !== undefined ? catData.featured : true,
+      featured:
+        catData.featured !== undefined ? catData.featured : true,
       description: catData.description || 'Custom print collection'
     };
-    setCategories((prev) => [newCat, ...prev]);
-    apiFetch('/api/categories', {
+
+    setCategories(prev => [newCat, ...prev]);
+
+    const payload = {
+      ...newCat,
+      image: imagePath
+    };
+
+    void apiFetch('/api/categories', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(catData) // send original data
-    }).catch(err => console.warn('Category API sync error:', err));
+      body: JSON.stringify(payload)
+    })
+      .then(async res => {
+        if (!res.ok) {
+          let message = 'Failed to create category';
+
+          try {
+            const data = await res.json();
+            message = data?.error || data?.message || message;
+          } catch {
+            // Ignore invalid error JSON.
+          }
+
+          throw new Error(message);
+        }
+      })
+      .catch(err => {
+        console.error('Category create API error:', err);
+
+        setCategories(prev =>
+          prev.filter(category => category.id !== newId)
+        );
+
+        showToast(
+          err instanceof Error
+            ? err.message
+            : 'Failed to create category',
+          'error'
+        );
+      });
 
     showToast(`Category "${newCat.name}" added!`, 'success');
   };
 
-  const updateCategory = (categoryId: string, updatedData: Partial<Category>) => {
-    const transformedData = { ...updatedData };
-    if (updatedData.image) {
-      transformedData.image = getFullImageUrl(updatedData.image);
-    }
-    setCategories((prev) =>
-      prev.map((c) => (c.id === categoryId ? { ...c, ...transformedData } : c))
-    );
-    apiFetch(`/api/categories/${categoryId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedData)
-    }).catch(err => console.warn('Category update API sync error:', err));
+  const updateCategory = async (
+    categoryId: string,
+    updatedData: Partial<Category>
+  ): Promise<void> => {
+    const apiData: Partial<Category> = {
+      ...updatedData,
+      ...(updatedData.image !== undefined
+        ? {
+            image: normalizeImageUrlForApi(updatedData.image)
+          }
+        : {})
+    };
 
-    showToast('Category updated successfully!', 'success');
+    try {
+      const res = await apiFetch(`/api/categories/${categoryId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(apiData)
+      });
+
+      if (!res.ok) {
+        let message = 'Failed to update category';
+
+        try {
+          const data = await res.json();
+          message = data?.error || data?.message || message;
+        } catch {
+          // Ignore invalid error JSON.
+        }
+
+        throw new Error(message);
+      }
+
+      let responseCategory: Partial<Category> | null = null;
+
+      try {
+        const data = await res.json();
+        responseCategory =
+          data?.category ||
+          data?.item ||
+          data?.data ||
+          null;
+      } catch {
+        // Empty successful response is valid.
+      }
+
+      const sourceData = responseCategory || updatedData;
+
+      const displayData: Partial<Category> = {
+        ...sourceData,
+        ...(sourceData.image !== undefined
+          ? { image: getFullImageUrl(sourceData.image) }
+          : {})
+      };
+
+      setCategories(prev =>
+        prev.map(category =>
+          category.id === categoryId
+            ? { ...category, ...displayData }
+            : category
+        )
+      );
+
+      showToast('Category updated successfully!', 'success');
+    } catch (err) {
+      console.error('Category update API error:', err);
+
+      showToast(
+        err instanceof Error
+          ? err.message
+          : 'Failed to update category',
+        'error'
+      );
+    }
   };
 
-  const deleteCategory = (categoryId: string) => {
-    setCategories((prev) => prev.filter((c) => c.id !== categoryId));
-    apiFetch(`/api/categories/${categoryId}`, {
-      method: 'DELETE'
-    }).catch(err => console.warn('Category delete API sync error:', err));
+  const deleteCategory = async (categoryId: string): Promise<void> => {
+    try {
+      const res = await apiFetch(`/api/categories/${categoryId}`, {
+        method: 'DELETE'
+      });
 
-    showToast('Category removed.', 'info');
+      if (!res.ok) {
+        let message = 'Failed to delete category';
+
+        try {
+          const data = await res.json();
+          message = data?.error || data?.message || message;
+        } catch {
+          // Ignore invalid error JSON.
+        }
+
+        throw new Error(message);
+      }
+
+      setCategories(prev =>
+        prev.filter(category => category.id !== categoryId)
+      );
+
+      showToast('Category removed.', 'info');
+    } catch (err) {
+      console.error('Category delete API error:', err);
+
+      showToast(
+        err instanceof Error
+          ? err.message
+          : 'Failed to delete category',
+        'error'
+      );
+    }
   };
 
   // Services CRUD (no images typically)
@@ -859,20 +1213,40 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Portfolio CRUD with image transformation
-  const addPortfolioItem = async (itemData: Partial<PortfolioItem>): Promise<PortfolioItem | null> => {
-    const imageUrl = itemData.image ? getFullImageUrl(itemData.image) : 'https://images.unsplash.com/photo-1626785774573-4b799315345d?w=800&auto=format&fit=crop&q=80';
+  const addPortfolioItem = async (
+    itemData: Partial<PortfolioItem>
+  ): Promise<PortfolioItem | null> => {
+    const imagePath = itemData.image
+      ? normalizeImageUrlForApi(itemData.image)
+      : '';
+
+    const imageUrl = imagePath
+      ? getFullImageUrl(imagePath)
+      : 'https://images.unsplash.com/photo-1626785774573-4b799315345d?w=800&auto=format&fit=crop&q=80';
+
     const newItem: PortfolioItem = {
       id: itemData.id || `work-${Date.now()}`,
       title: itemData.title || 'New Design Project',
-      titleMr: itemData.titleMr || itemData.title || 'नवीन डिझाईन प्रकल्प',
+      titleMr:
+        itemData.titleMr ||
+        itemData.title ||
+        'नवीन डिझाईन प्रकल्प',
       category: itemData.category || 'branding',
-      categoryLabel: itemData.categoryLabel || 'Branding',
-      categoryLabelMr: itemData.categoryLabelMr || itemData.categoryLabel || 'ब्रँडिंग',
-      client: itemData.client || 'Enterprise Client',
-      city: itemData.city || 'Chh. Sambhajinagar',
-      cityMr: itemData.cityMr || 'छत्रपती संभाजीनगर',
+      categoryLabel:
+        itemData.categoryLabel || 'Branding',
+      categoryLabelMr:
+        itemData.categoryLabelMr ||
+        itemData.categoryLabel ||
+        'ब्रँडिंग',
+      client:
+        itemData.client || 'Enterprise Client',
+      city:
+        itemData.city || 'Chh. Sambhajinagar',
+      cityMr:
+        itemData.cityMr || 'छत्रपती संभाजीनगर',
       image: imageUrl,
-      aspectRatio: itemData.aspectRatio || 'square',
+      aspectRatio:
+        itemData.aspectRatio || 'square',
       description: itemData.description || '',
       descriptionMr: itemData.descriptionMr || '',
       tags: itemData.tags || [],
@@ -882,83 +1256,275 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       badgeMr: itemData.badgeMr || undefined
     };
 
-    setPortfolio((prev) => [newItem, ...prev]);
-
     try {
       const res = await apiFetch('/api/portfolio', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(itemData) // send original data
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ...itemData,
+          image: imagePath
+        })
       });
-      const data = await res.json();
-      if (data.success && data.item) {
-        showToast(`Design work "${newItem.title}" added to showcase!`, 'success');
-        return data.item;
+
+      if (!res.ok) {
+        let message = 'Failed to create portfolio item';
+
+        try {
+          const data = await res.json();
+          message =
+            data?.error ||
+            data?.message ||
+            message;
+        } catch {
+          // Ignore invalid error JSON.
+        }
+
+        throw new Error(message);
       }
+
+      const data = await res.json();
+
+      if (!data.success || !data.item) {
+        throw new Error(
+          'Portfolio item was not returned by the server'
+        );
+      }
+
+      const transformedItem =
+        transformImageUrls(
+          data.item as PortfolioItem
+        );
+
+      setPortfolio(prev => [
+        transformedItem,
+        ...prev
+      ]);
+
+      showToast(
+        `Design work "${newItem.title}" added to showcase!`,
+        'success'
+      );
+
+      return transformedItem;
     } catch (err) {
-      console.warn('Portfolio API sync error:', err);
+      console.error(
+        'Portfolio create API error:',
+        err
+      );
+
+      showToast(
+        err instanceof Error
+          ? err.message
+          : 'Failed to create portfolio item',
+        'error'
+      );
+
+      return null;
     }
-    showToast(`Design work "${newItem.title}" saved!`, 'success');
-    return newItem;
   };
 
-  const updatePortfolioItem = async (id: string, updatedData: Partial<PortfolioItem>): Promise<boolean> => {
-    const transformedData = { ...updatedData };
-    if (updatedData.image) {
-      transformedData.image = getFullImageUrl(updatedData.image);
-    }
-    setPortfolio((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...transformedData } : item))
-    );
+  const updatePortfolioItem = async (
+    id: string,
+    updatedData: Partial<PortfolioItem>
+  ): Promise<boolean> => {
+    const apiData: Partial<PortfolioItem> = {
+      ...updatedData,
+      ...(updatedData.image !== undefined
+        ? {
+            image: normalizeImageUrlForApi(
+              updatedData.image
+            )
+          }
+        : {})
+    };
 
     try {
-      const res = await apiFetch(`/api/portfolio/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedData)
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast('Design work updated successfully!', 'success');
-        return true;
+      const res = await apiFetch(
+        `/api/portfolio/${encodeURIComponent(id)}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(apiData)
+        }
+      );
+
+      if (!res.ok) {
+        let message =
+          'Failed to update portfolio item';
+
+        try {
+          const data = await res.json();
+          message =
+            data?.error ||
+            data?.message ||
+            message;
+        } catch {
+          // Ignore invalid error JSON.
+        }
+
+        throw new Error(message);
       }
+
+      let responseItem:
+        | Partial<PortfolioItem>
+        | null = null;
+
+      try {
+        const data = await res.json();
+        responseItem =
+          data?.item ||
+          data?.portfolioItem ||
+          data?.data ||
+          null;
+      } catch {
+        // Empty successful response is valid.
+      }
+
+      const sourceData =
+        responseItem || updatedData;
+
+      const displayData: Partial<PortfolioItem> = {
+        ...sourceData,
+        ...(sourceData.image !== undefined
+          ? {
+              image: getFullImageUrl(
+                sourceData.image
+              )
+            }
+          : {})
+      };
+
+      setPortfolio(prev =>
+        prev.map(item =>
+          String(item.id) === String(id)
+            ? { ...item, ...displayData }
+            : item
+        )
+      );
+
+      showToast(
+        'Design work updated successfully!',
+        'success'
+      );
+
+      return true;
     } catch (err) {
-      console.warn('Portfolio update API sync error:', err);
+      console.error(
+        'Portfolio update API error:',
+        err
+      );
+
+      showToast(
+        err instanceof Error
+          ? err.message
+          : 'Failed to update portfolio item',
+        'error'
+      );
+
+      return false;
     }
-    showToast('Design work updated!', 'success');
-    return true;
   };
 
-  const deletePortfolioItem = async (id: string): Promise<boolean> => {
-    setPortfolio((prev) => prev.filter((item) => item.id !== id));
+  const deletePortfolioItem = async (
+    id: string
+  ): Promise<boolean> => {
     try {
-      const res = await apiFetch(`/api/portfolio/${id}`, {
-        method: 'DELETE'
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast('Design work removed from portfolio.', 'info');
-        return true;
+      const res = await apiFetch(
+        `/api/portfolio/${encodeURIComponent(id)}`,
+        {
+          method: 'DELETE'
+        }
+      );
+
+      if (!res.ok) {
+        let message =
+          'Failed to delete portfolio item';
+
+        try {
+          const data = await res.json();
+          message =
+            data?.error ||
+            data?.message ||
+            message;
+        } catch {
+          // Ignore invalid error JSON.
+        }
+
+        throw new Error(message);
       }
+
+      setPortfolio(prev =>
+        prev.filter(
+          item =>
+            String(item.id) !== String(id)
+        )
+      );
+
+      showToast(
+        'Design work removed from portfolio.',
+        'info'
+      );
+
+      return true;
     } catch (err) {
-      console.warn('Portfolio delete API sync error:', err);
+      console.error(
+        'Portfolio delete API error:',
+        err
+      );
+
+      showToast(
+        err instanceof Error
+          ? err.message
+          : 'Failed to delete portfolio item',
+        'error'
+      );
+
+      return false;
     }
-    showToast('Design work removed.', 'info');
-    return true;
   };
 
   const refreshPortfolio = async () => {
     try {
-      const res = await apiFetch('/api/portfolio');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.portfolio)) {
-          const transformed = data.portfolio.map((p: PortfolioItem) => transformImageUrls(p));
-          setPortfolio(transformed);
-        }
+      const res = await apiFetch(
+        '/api/portfolio'
+      );
+
+      if (!res.ok) {
+        throw new Error(
+          `Portfolio refresh failed (${res.status})`
+        );
+      }
+
+      const data = await res.json();
+
+      if (
+        data.success &&
+        Array.isArray(data.portfolio)
+      ) {
+        const transformed =
+          data.portfolio.map(
+            (item: PortfolioItem) =>
+              transformImageUrls(item)
+          );
+
+        setPortfolio(transformed);
       }
     } catch (err) {
-      console.warn('Portfolio refresh error:', err);
+      console.warn(
+        'Portfolio refresh error:',
+        err
+      );
+
+      showToast(
+        err instanceof Error
+          ? err.message
+          : 'Failed to refresh portfolio',
+        'error'
+      );
     }
   };
 
@@ -1124,152 +1690,449 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }).catch(err => console.warn('Quote delete API sync error:', err));
     try {
       if (db) {
-        deleteDoc(doc(db, 'quotes', quoteId)).catch(() => {});
+        deleteDoc(doc(db, 'quotes', quoteId)).catch(() => { });
       }
-    } catch (_err) {}
+    } catch (_err) { }
     showToast('Quote request removed', 'info');
   };
 
   // Hero Slide handlers
-  const addHeroSlide = async (slideData: Partial<HeroSlide>): Promise<HeroSlide | null> => {
+  const addHeroSlide = async (
+    slideData: Partial<HeroSlide>
+  ): Promise<HeroSlide | null> => {
     const tempId = `slide-${Date.now()}`;
-    const imageUrl = slideData.image ? getFullImageUrl(slideData.image) : 'https://i.pinimg.com/736x/c6/e3/bb/c6e3bbbd242f377f64021fe55c33b17d.jpg';
+
+    const imagePath = slideData.image
+      ? normalizeImageUrlForApi(slideData.image)
+      : '';
+
+    const imageUrl = imagePath
+      ? getFullImageUrl(imagePath)
+      : 'https://i.pinimg.com/736x/c6/e3/bb/c6e3bbbd242f377f64021fe55c33b17d.jpg';
+
     const newSlide: HeroSlide = {
       id: tempId,
-      title1: slideData.title1 || 'Exclusive Commercial Print Services',
+      title1:
+        slideData.title1 ||
+        'Exclusive Commercial Print Services',
       title2: slideData.title2 || '',
       highlight: slideData.highlight || '',
       subtitle: slideData.subtitle || '',
       image: imageUrl,
       buttonText: slideData.buttonText || 'Order Now',
-      quoteButtonText: slideData.quoteButtonText || 'Quick Quote',
+      quoteButtonText:
+        slideData.quoteButtonText || 'Quick Quote',
       typeLabel: slideData.typeLabel || 'Printing',
       productId: slideData.productId || '',
       categoryLink: slideData.categoryLink || '/products',
       theme: slideData.theme || 'crimson',
       tag: slideData.tag || '',
       badge: slideData.badge || '',
-      displayOrder: slideData.displayOrder ?? (heroSlides.length + 1),
+      displayOrder:
+        slideData.displayOrder ?? (heroSlides.length + 1),
       isActive: slideData.isActive !== false,
       createdAt: new Date().toISOString()
     };
-
-    setHeroSlides(prev => [...prev, newSlide]);
 
     try {
       const res = await apiFetch('/api/hero-slides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(slideData) // send original
+        body: JSON.stringify({
+          ...slideData,
+          ...(slideData.image !== undefined
+            ? { image: imagePath }
+            : {})
+        })
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.slide) {
-          const transformedSlide = transformImageUrls(data.slide);
-          setHeroSlides(prev => prev.map(s => s.id === tempId ? transformedSlide : s));
-          showToast('Hero banner saved successfully', 'success');
-          return transformedSlide;
+
+      if (!res.ok) {
+        let message = 'Failed to create hero banner';
+
+        try {
+          const data = await res.json();
+          message = data?.error || data?.message || message;
+        } catch {
+          // Ignore invalid error JSON.
         }
+
+        throw new Error(message);
       }
+
+      const data = await res.json();
+
+      if (!data.success || !data.slide) {
+        throw new Error('Hero banner was not returned by the server');
+      }
+
+      const transformedSlide = transformImageUrls(
+        data.slide as HeroSlide
+      );
+
+      setHeroSlides(prev =>
+        prev.map(slide =>
+          String(slide.id) === String(tempId)
+            ? transformedSlide
+            : slide
+        )
+      );
+
+      showToast(
+        'Hero banner saved successfully',
+        'success'
+      );
+
+      return transformedSlide;
     } catch (err) {
       console.error('Error creating hero slide:', err);
+
+      showToast(
+        err instanceof Error
+          ? err.message
+          : 'Failed to save hero banner',
+        'error'
+      );
+
+      return null;
     }
-    showToast('Hero banner saved', 'success');
-    return newSlide;
   };
 
-  const updateHeroSlide = async (id: string | number, updatedData: Partial<HeroSlide>, silent = false): Promise<boolean> => {
-    // Transform image if present
-    const transformedData = { ...updatedData };
-    if (updatedData.image) {
-      transformedData.image = getFullImageUrl(updatedData.image);
-    }
-    setHeroSlides(prev =>
-      prev.map(s => (s.id === id ? { ...s, ...transformedData, updatedAt: new Date().toISOString() } : s))
-    );
+  const updateHeroSlide = async (
+    id: string | number,
+    updatedData: Partial<HeroSlide>,
+    silent = false
+  ): Promise<boolean> => {
+    const apiData: Partial<HeroSlide> = {
+      ...updatedData,
+      ...(updatedData.image !== undefined
+        ? {
+            image: normalizeImageUrlForApi(
+              updatedData.image
+            )
+          }
+        : {})
+    };
 
     try {
-      const res = await apiFetch(`/api/hero-slides/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedData) // send original
-      });
-      if (res.ok) {
-        if (!silent) {
-          showToast('Banner updated successfully', 'success');
+      const res = await apiFetch(
+        `/api/hero-slides/${encodeURIComponent(String(id))}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(apiData)
         }
-        return true;
+      );
+
+      if (!res.ok) {
+        let errorMessage = 'Failed to update banner';
+
+        try {
+          const data = await res.json();
+          errorMessage =
+            data?.error ||
+            data?.message ||
+            errorMessage;
+        } catch {
+          // Ignore invalid error JSON.
+        }
+
+        throw new Error(errorMessage);
       }
+
+      let responseSlide: Partial<HeroSlide> | null = null;
+
+      try {
+        const data = await res.json();
+        responseSlide =
+          data?.slide ||
+          data?.item ||
+          data?.data ||
+          null;
+      } catch {
+        // Empty successful response is valid.
+      }
+
+      const sourceData = responseSlide || updatedData;
+
+      const displayData: Partial<HeroSlide> = {
+        ...sourceData,
+        ...(sourceData.image !== undefined
+          ? {
+              image: getFullImageUrl(
+                sourceData.image
+              )
+            }
+          : {})
+      };
+
+      setHeroSlides(prev =>
+        prev.map(slide =>
+          String(slide.id) === String(id)
+            ? {
+                ...slide,
+                ...displayData,
+                updatedAt: new Date().toISOString()
+              }
+            : slide
+        )
+      );
+
+      if (!silent) {
+        showToast(
+          'Banner updated successfully',
+          'success'
+        );
+      }
+
+      return true;
     } catch (err) {
-      console.error('Error updating hero slide:', err);
+      console.error(
+        'Error updating hero slide:',
+        err
+      );
+
+      if (!silent) {
+        showToast(
+          err instanceof Error
+            ? err.message
+            : 'Failed to update banner',
+          'error'
+        );
+      }
+
+      return false;
     }
-    if (!silent) {
-      showToast('Banner updated', 'info');
-    }
-    return true;
   };
 
-  const deleteHeroSlide = async (id: string | number): Promise<boolean> => {
-    setHeroSlides(prev => prev.filter(s => s.id !== id));
+  const deleteHeroSlide = async (
+    id: string | number
+  ): Promise<boolean> => {
     try {
-      const res = await apiFetch(`/api/hero-slides/${id}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        showToast('Banner deleted', 'info');
-        return true;
+      const res = await apiFetch(
+        `/api/hero-slides/${encodeURIComponent(String(id))}`,
+        {
+          method: 'DELETE'
+        }
+      );
+
+      if (!res.ok) {
+        let message = 'Failed to delete banner';
+
+        try {
+          const data = await res.json();
+          message =
+            data?.error ||
+            data?.message ||
+            message;
+        } catch {
+          // Ignore invalid error JSON.
+        }
+
+        throw new Error(message);
       }
+
+      setHeroSlides(prev =>
+        prev.filter(
+          slide =>
+            String(slide.id) !== String(id)
+        )
+      );
+
+      showToast('Banner deleted', 'info');
+      return true;
     } catch (err) {
-      console.error('Error deleting hero slide:', err);
+      console.error(
+        'Error deleting hero slide:',
+        err
+      );
+
+      showToast(
+        err instanceof Error
+          ? err.message
+          : 'Failed to delete banner',
+        'error'
+      );
+
+      return false;
     }
-    showToast('Banner deleted', 'info');
-    return true;
   };
 
-  const reorderHeroSlides = async (orderedIds: (string | number)[]): Promise<boolean> => {
+  const reorderHeroSlides = async (
+    orderedIds: (string | number)[]
+  ): Promise<boolean> => {
+    const originalSlides = [...heroSlides];
+
     const reordered: HeroSlide[] = [];
+
     orderedIds.forEach((id, idx) => {
-      const found = heroSlides.find(s => String(s.id) === String(id));
+      const found = heroSlides.find(
+        slide =>
+          String(slide.id) === String(id)
+      );
+
       if (found) {
-        reordered.push({ ...found, displayOrder: idx + 1 });
+        reordered.push({
+          ...found,
+          displayOrder: idx + 1
+        });
       }
     });
-    setHeroSlides(reordered);
+
+    // Preserve any slides not included in orderedIds.
+    heroSlides.forEach(slide => {
+      if (
+        !reordered.some(
+          item =>
+            String(item.id) === String(slide.id)
+        )
+      ) {
+        reordered.push({
+          ...slide,
+          displayOrder: reordered.length + 1
+        });
+      }
+    });
 
     try {
-      await apiFetch('/api/hero-slides/reorder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderedIds })
-      });
+      const res = await apiFetch(
+        '/api/hero-slides/reorder',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            orderedIds
+          })
+        }
+      );
+
+      if (!res.ok) {
+        let message = 'Failed to reorder banners';
+
+        try {
+          const data = await res.json();
+          message =
+            data?.error ||
+            data?.message ||
+            message;
+        } catch {
+          // Ignore invalid error JSON.
+        }
+
+        throw new Error(message);
+      }
+
+      setHeroSlides(reordered);
+      showToast(
+        'Hero banner order updated',
+        'success'
+      );
+
+      return true;
     } catch (err) {
-      console.error('Error syncing slide order:', err);
+      console.error(
+        'Error syncing slide order:',
+        err
+      );
+
+      // Restore the previous state if backend failed.
+      setHeroSlides(originalSlides);
+
+      showToast(
+        err instanceof Error
+          ? err.message
+          : 'Failed to reorder banners',
+        'error'
+      );
+
+      return false;
     }
-    return true;
   };
 
   const resetHeroSlides = async (): Promise<void> => {
     try {
-      await apiFetch('/api/hero-slides/reset', { method: 'POST' });
+      const res = await apiFetch(
+        '/api/hero-slides/reset',
+        { method: 'POST' }
+      );
+
+      if (!res.ok) {
+        let message = 'Failed to reset hero slides';
+
+        try {
+          const data = await res.json();
+          message =
+            data?.error ||
+            data?.message ||
+            message;
+        } catch {
+          // Ignore invalid error JSON.
+        }
+
+        throw new Error(message);
+      }
+
       await fetchAllInitialData();
-      showToast('Hero banners reset to default layout', 'info');
+
+      showToast(
+        'Hero banners reset to default layout',
+        'info'
+      );
     } catch (err) {
-      console.error('Error resetting hero slides:', err);
+      console.error(
+        'Error resetting hero slides:',
+        err
+      );
+
+      showToast(
+        err instanceof Error
+          ? err.message
+          : 'Failed to reset hero banners',
+        'error'
+      );
     }
   };
 
   const refreshHeroSlides = async (): Promise<void> => {
     try {
-      const res = await apiFetch('/api/hero-slides');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.slides)) {
-          const transformed = data.slides.map((s: HeroSlide) => transformImageUrls(s));
-          setHeroSlides(transformed);
-        }
+      const res = await apiFetch(
+        '/api/hero-slides'
+      );
+
+      if (!res.ok) {
+        throw new Error(
+          `Hero refresh failed (${res.status})`
+        );
+      }
+
+      const data = await res.json();
+
+      if (
+        data.success &&
+        Array.isArray(data.slides)
+      ) {
+        const transformed =
+          data.slides.map((slide: HeroSlide) =>
+            transformImageUrls(slide)
+          );
+
+        setHeroSlides(transformed);
       }
     } catch (err) {
-      console.error('Error refreshing hero slides:', err);
+      console.error(
+        'Error refreshing hero slides:',
+        err
+      );
+
+      showToast(
+        err instanceof Error
+          ? err.message
+          : 'Failed to refresh hero banners',
+        'error'
+      );
     }
   };
 
@@ -1404,9 +2267,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     try {
       const authResponse = await apiFetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: cleanPhone, name })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: cleanPhone, name })
       });
       if (!authResponse.ok) throw new Error('Authentication failed');
       const data = await authResponse.json();
@@ -1430,8 +2293,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const updateUserProfile = async (updatedFields: Partial<User>): Promise<boolean> => {
     if (!currentUser) return false;
     const hasValidName = Boolean(
-      updatedFields.name && 
-      updatedFields.name.trim().length > 1 && 
+      updatedFields.name &&
+      updatedFields.name.trim().length > 1 &&
       !updatedFields.name.trim().toLowerCase().startsWith('customer')
     );
 
@@ -1721,7 +2584,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     if (currentUser) {
       const existingAddrs = currentUser.addresses || [];
-      const hasAddr = existingAddrs.some(a => 
+      const hasAddr = existingAddrs.some(a =>
         a.addressLine?.toLowerCase() === newOrder.shippingAddress?.toLowerCase() &&
         a.pincode === newOrder.pincode
       );
@@ -1806,7 +2669,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           updatedAt: new Date().toISOString()
         }, { merge: true }).catch(e => console.warn('Firestore order backup notice:', e));
       }
-    } catch (_err) {}
+    } catch (_err) { }
 
     showToast(`🎉 Order ${newOrder.orderNumber} placed successfully!`, 'success');
     return newOrder;
@@ -1955,7 +2818,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           updatedAt: new Date().toISOString()
         }, { merge: true }).catch(e => console.warn('Firestore manual order backup notice:', e));
       }
-    } catch (_err) {}
+    } catch (_err) { }
 
     showToast(`🎉 Order #${newOrder.orderNumber} added successfully!`, 'success');
     return newOrder;
@@ -1991,7 +2854,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           updatedAt: new Date().toISOString()
         }, { merge: true }).catch(e => console.warn('Firestore quote backup notice:', e));
       }
-    } catch (_err) {}
+    } catch (_err) { }
 
     showToast('Bulk quote request sent to estimations team!', 'success');
   };
@@ -2006,6 +2869,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const logout = () => {
     setCurrentUser(null);
     localStorage.removeItem('proprint_auth_token');
+    localStorage.removeItem('proprint_user');
+    sessionStorage.removeItem('proprint_profile_prompt_dismissed');
     showToast('Signed out successfully', 'info');
   };
 
