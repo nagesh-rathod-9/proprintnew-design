@@ -165,7 +165,7 @@ export const BestSellingGrid: React.FC<BestSellingGridProps> = ({
       </div>
 
       {/* 6 Products Grid: strictly 1 row on mobile with horizontal scroll, responsive grid on md/lg */}
-      <div className="flex md:grid overflow-x-auto md:overflow-visible md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-5 pb-2 md:pb-0 scrollbar-none snap-x">
+      <div className="mobile-horizontal-scroll flex md:grid overflow-x-auto md:overflow-visible md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-5 pb-2 md:pb-0 scrollbar-none snap-x">
         {(apiProducts || []).map((product) => {
           const isWishlisted = (wishlistIds || []).includes(product.id);
 

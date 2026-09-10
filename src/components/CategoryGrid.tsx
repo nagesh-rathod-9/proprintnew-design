@@ -91,7 +91,7 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({
         {/* Horizontal Scroll / Grid */}
         <div 
           ref={scrollContainerRef}
-          className="flex items-stretch gap-3 sm:gap-4 overflow-x-auto pb-3 pt-1 scrollbar-none scroll-smooth snap-x snap-mandatory"
+          className="mobile-horizontal-scroll flex items-stretch gap-3 sm:gap-4 overflow-x-auto pb-3 pt-1 scrollbar-none scroll-smooth snap-x snap-mandatory"
         >
           {(apiCategories || []).map((item) => (
             <button

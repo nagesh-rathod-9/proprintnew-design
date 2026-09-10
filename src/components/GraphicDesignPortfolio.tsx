@@ -63,7 +63,7 @@ export const GraphicDesignPortfolio: React.FC<GraphicDesignPortfolioProps> = ({
       </div>
 
       {/* 5 Cards Row: strictly 1 row on mobile with horizontal scroll, responsive 5-cols on large screens */}
-      <div className="flex lg:grid overflow-x-auto lg:overflow-visible lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-5 pb-2 lg:pb-0 scrollbar-none snap-x">
+      <div className="mobile-horizontal-scroll flex lg:grid overflow-x-auto lg:overflow-visible lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-5 pb-2 lg:pb-0 scrollbar-none snap-x">
         {(portfolioItems || []).map((item) => (
           <div
             key={item.id}

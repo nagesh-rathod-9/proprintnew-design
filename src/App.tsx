@@ -57,35 +57,64 @@ const PullToRefresh: React.FC<{ children: React.ReactNode; onRefresh: () => Prom
   children,
   onRefresh,
 }) => {
-  const [startY, setStartY] = useState(0);
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const startPointRef = useRef<{ x: number; y: number } | null>(null);
+  const pullDistanceRef = useRef(0);
+  const isRefreshingRef = useRef(false);
+  const onRefreshRef = useRef(onRefresh);
+
+  onRefreshRef.current = onRefresh;
+  isRefreshingRef.current = isRefreshing;
 
   const handleTouchStart = (e: TouchEvent) => {
     // Only enable pull-to-refresh if at the top of the scrollable area
     const scrollable = containerRef.current?.querySelector('.pull-to-refresh-scroll');
     if (scrollable && scrollable.scrollTop === 0) {
-      setStartY(e.touches[0].clientY);
+      startPointRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+      };
     }
   };
 
   const handleTouchMove = (e: TouchEvent) => {
-    if (startY === 0) return;
-    const delta = e.touches[0].clientY - startY;
-    if (delta > 0 && delta < 120) {
-      setPullDistance(delta);
+    if (!startPointRef.current || isRefreshingRef.current) return;
+
+    const deltaX = e.touches[0].clientX - startPointRef.current.x;
+    const deltaY = e.touches[0].clientY - startPointRef.current.y;
+
+    // Leave horizontal carousels completely native; pull-to-refresh only owns
+    // a mostly vertical gesture that starts at the top of the page.
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      startPointRef.current = null;
+      pullDistanceRef.current = 0;
+      setPullDistance(0);
+      return;
+    }
+
+    if (deltaY > 0 && deltaY < 120) {
+      pullDistanceRef.current = deltaY;
+      setPullDistance(deltaY);
       e.preventDefault();
     }
   };
 
   const handleTouchEnd = async () => {
-    if (pullDistance > 60 && !isRefreshing) {
+    const distance = pullDistanceRef.current;
+    if (distance > 60 && !isRefreshingRef.current) {
+      isRefreshingRef.current = true;
       setIsRefreshing(true);
-      await onRefresh();
-      setIsRefreshing(false);
+      try {
+        await onRefreshRef.current();
+      } finally {
+        isRefreshingRef.current = false;
+        setIsRefreshing(false);
+      }
     }
-    setStartY(0);
+    startPointRef.current = null;
+    pullDistanceRef.current = 0;
     setPullDistance(0);
   };
 
@@ -96,8 +125,8 @@ const PullToRefresh: React.FC<{ children: React.ReactNode; onRefresh: () => Prom
     const scrollable = el.querySelector('.pull-to-refresh-scroll') as HTMLElement;
     if (!scrollable) return;
 
-    scrollable.addEventListener('touchstart', handleTouchStart);
-    scrollable.addEventListener('touchmove', handleTouchMove);
+    scrollable.addEventListener('touchstart', handleTouchStart, { passive: true });
+    scrollable.addEventListener('touchmove', handleTouchMove, { passive: false });
     scrollable.addEventListener('touchend', handleTouchEnd);
 
     return () => {
@@ -105,7 +134,7 @@ const PullToRefresh: React.FC<{ children: React.ReactNode; onRefresh: () => Prom
       scrollable.removeEventListener('touchmove', handleTouchMove);
       scrollable.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [startY, pullDistance, isRefreshing]);
+  }, []);
 
   return (
     <div ref={containerRef} className="h-full flex flex-col">

@@ -49,7 +49,7 @@ export const QuickCategories: React.FC<QuickCategoriesProps> = ({
       <div className="w-full max-w-[1440px] mx-auto px-3 sm:px-5 md:px-8">
         
         {/* Horizontal scroll container with touch snap */}
-        <div className="flex items-center gap-2.5 sm:gap-3 overflow-x-auto pb-1 scrollbar-none no-scrollbar justify-start">
+        <div className="mobile-horizontal-scroll flex items-center gap-2.5 sm:gap-3 overflow-x-auto pb-1 scrollbar-none no-scrollbar justify-start">
           
           {/* 1. All Services Red Button */}
           <button
