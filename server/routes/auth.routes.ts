@@ -48,7 +48,7 @@ const mapUserRow = (row: any) => {
   };
 };
 
-const ADMIN_PHONE = '7666969836';
+const ADMIN_PHONES = new Set(['7666969836', '9623458919']);
 
 // POST /api/auth/login - Phone-based login. The verified phone determines the role.
 authRouter.post('/login', authLimiter, async (req: Request, res: Response) => {
@@ -62,7 +62,7 @@ authRouter.post('/login', authLimiter, async (req: Request, res: Response) => {
 
     const db = await getDb();
     const existing = queryOne<any>(db, `SELECT * FROM users WHERE phone = ? LIMIT 1`, [cleanPhone]);
-    const role = cleanPhone === ADMIN_PHONE ? 'admin' : 'customer';
+    const role = ADMIN_PHONES.has(cleanPhone) || existing?.role === 'admin' ? 'admin' : 'customer';
     const userId = existing?.id || `user-${cleanPhone}`;
     const userName = name || existing?.name || (role === 'admin' ? 'Admin Manager' : 'Customer');
     const email = existing?.email || `${cleanPhone}@proprint.in`;
@@ -111,7 +111,7 @@ authRouter.post('/register', authLimiter, async (req: Request, res: Response) =>
     if (cleanPhone.length !== 10) {
       return res.status(400).json({ success: false, error: 'A valid 10-digit mobile number is required' });
     }
-    const role = cleanPhone === ADMIN_PHONE ? 'admin' : 'customer';
+    const role = ADMIN_PHONES.has(cleanPhone) ? 'admin' : 'customer';
 
     const defaultAddresses = [
       {

@@ -1034,10 +1034,10 @@ Hello Proprint Team, please confirm this order, share the digital proof, and pro
             <div
               key={sim.id}
               onClick={() => navigate(`/product/${sim.id}`)}
-              className="group bg-white rounded-3xl p-3 sm:p-4 border border-slate-200/90 hover:shadow-xl hover:border-[#FF0038] transition-all cursor-pointer flex flex-col justify-between"
+              className="group min-w-0 h-full bg-white rounded-3xl p-3 sm:p-4 border border-slate-200/90 hover:shadow-xl hover:border-[#FF0038] transition-shadow cursor-pointer flex flex-col"
             >
-              <div className="relative rounded-2xl bg-slate-50 overflow-hidden p-3 mb-3 flex items-center justify-center aspect-square">
-                <span className="absolute top-2 left-2 px-2 py-0.5 bg-slate-900 text-white rounded-md text-[9px] font-bold">
+              <div className="relative shrink-0 rounded-2xl bg-slate-50 overflow-hidden p-3 mb-3 flex items-center justify-center aspect-square">
+                <span className="absolute top-2 left-2 right-2 max-w-[calc(100%-1rem)] truncate px-2 py-0.5 bg-slate-900 text-white rounded-md text-[9px] font-bold">
                   {sim.category || 'Printing'}
                 </span>
                 <img
@@ -1047,18 +1047,18 @@ Hello Proprint Team, please confirm this order, share the digital proof, and pro
                 />
               </div>
 
-              <div className="space-y-1">
+              <div className="min-w-0 flex-1 flex flex-col justify-between gap-2">
                 <h3 className="font-bold text-slate-900 text-xs sm:text-sm truncate group-hover:text-[#FF0038] transition-colors">
                   {isMarathi && sim.nameMr ? sim.nameMr : sim.name}
                 </h3>
-                <div className="flex items-center justify-between pt-1.5">
+                <div className="min-w-0 flex items-end justify-between gap-2 pt-1.5">
                   <div>
                     <span className="text-[10px] text-slate-400 block">Starting at</span>
-                    <span className="font-black text-slate-900 text-sm sm:text-base">
+                    <span className="font-black text-slate-900 text-sm sm:text-base whitespace-nowrap">
                       ₹{sim.basePrice}
                     </span>
                   </div>
-                  <span className="text-[11px] text-[#FF0038] font-bold">
+                  <span className="shrink-0 whitespace-nowrap text-[11px] text-[#FF0038] font-bold">
                     Configure →
                   </span>
                 </div>

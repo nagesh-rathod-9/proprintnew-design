@@ -56,7 +56,7 @@ export const AllProductsView: React.FC<AllProductsViewProps> = ({
   // Filter products by search query, selected category, and max price
   const filteredProducts = products.filter((item) => {
     // Category match
-    if (selectedCategory) {
+    if (selectedCategory && selectedCategory !== 'all') {
       const sCat = selectedCategory.toLowerCase();
       const pCat = (item.categoryId || '').toLowerCase();
       const pName = (item.category || '').toLowerCase();
@@ -81,8 +81,10 @@ export const AllProductsView: React.FC<AllProductsViewProps> = ({
       const matchName = item.name?.toLowerCase().includes(q);
       const matchNameMr = item.nameMr?.toLowerCase().includes(q);
       const matchCategory = item.category?.toLowerCase().includes(q);
+      const matchDescription = item.description?.toLowerCase().includes(q);
+      const matchDescriptionMr = item.descriptionMr?.toLowerCase().includes(q);
       const matchTags = item.tags?.some((t) => t.toLowerCase().includes(q));
-      if (!matchName && !matchNameMr && !matchCategory && !matchTags) return false;
+      if (!matchName && !matchNameMr && !matchCategory && !matchDescription && !matchDescriptionMr && !matchTags) return false;
     }
     // Price filter
     if (item.basePrice > maxPriceFilter) {
@@ -109,7 +111,7 @@ export const AllProductsView: React.FC<AllProductsViewProps> = ({
           <Breadcrumbs
             items={[
               { label: isMarathi ? 'मुख्यपृष्ठ' : 'Home', to: '/' },
-              ...(selectedCategory
+              ...(selectedCategory && selectedCategory !== 'all'
                 ? [
                     { 
                       label: isMarathi ? 'सर्व उत्पादने' : 'All Products', 

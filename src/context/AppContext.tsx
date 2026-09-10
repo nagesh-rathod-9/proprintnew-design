@@ -2245,7 +2245,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const loginWithPhone = async (phoneNumber: string, name?: string): Promise<{ success: boolean; user: User }> => {
     const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
     const existingUser = users.find(u => u.phone && u.phone.replace(/\D/g, '').slice(-10) === cleanPhone);
-    const isAdmin = cleanPhone === '7666969836';
+    const isAdmin = ['7666969836', '9623458919'].includes(cleanPhone) || existingUser?.role === 'admin';
 
     const userToLogin: User = existingUser || {
       id: `user-phone-${cleanPhone || Date.now()}`,
