@@ -279,7 +279,7 @@ Hello Proprint Team, please confirm this order, share the digital proof, and pro
                 <span className="text-rose-600 font-bold">{selectedQuantity} {product.unit}</span>
               </div>
               <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
-                {(product.quantityOptions || [100, 250, 500, 1000, 2000]).map((qty) => (
+                {(product.quantityOptions || [100, 200, 250, 500, 1000, 2000]).map((qty) => (
                   <button
                     key={qty}
                     onClick={() => setSelectedQuantity(qty)}

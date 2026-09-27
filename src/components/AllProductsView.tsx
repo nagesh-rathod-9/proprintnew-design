@@ -39,7 +39,8 @@ export const AllProductsView: React.FC<AllProductsViewProps> = ({
     toggleWishlist, 
     isInWishlist,
     products = [],
-    categories = []
+    categories = [],
+    services = []
   } = useApp();
   const [sortBy, setSortBy] = useState<'popular' | 'price-low' | 'price-high' | 'turnaround'>('popular');
   const [selectedSubCategory, setSelectedSubCategory] = useState<string>('all');
@@ -201,6 +202,53 @@ export const AllProductsView: React.FC<AllProductsViewProps> = ({
           )}
         </div>
       </div>
+
+      {services.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-rose-600">
+                {isMarathi ? 'मुख्य सेवांचे' : 'Core Services'}
+              </p>
+              <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">
+                {isMarathi ? 'प्रिंटिंग आणि डिझाईन सेवा' : 'Print & Design Services'}
+              </h2>
+            </div>
+            <span className="text-[10px] text-slate-500 font-semibold">
+              {services.length} {isMarathi ? 'सेवा' : 'services'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            {services.slice(0, 3).map((service) => (
+              <div
+                key={service.id}
+                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs hover:border-rose-300 hover:shadow-md transition-all"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full text-[9px] font-bold uppercase">
+                    {service.category === 'branding' ? (isMarathi ? 'डिझाईन' : 'Design') : (isMarathi ? 'प्रिंट' : 'Print')}
+                  </span>
+                </div>
+
+                <h3 className="mt-3 text-sm font-extrabold text-slate-900">
+                  {service.name}
+                </h3>
+                <p className="mt-1 text-[11px] text-slate-600 leading-relaxed">
+                  {service.tagline || service.description}
+                </p>
+                <div className="mt-3 flex items-center justify-between text-[10px] text-slate-500">
+                  <span>{service.turnaround || '24-48 hrs'}</span>
+                  <span>{service.minOrder || 'Min 50'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Main Grid: Desktop Sidebar Filters + Products Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">

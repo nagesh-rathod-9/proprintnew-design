@@ -113,6 +113,7 @@ export interface Product {
   originalPrice?: number;
   singlePrice?: number;
   bulkPrice100?: number;
+  bulkPrice200?: number;
   bulkPrice500?: number;
   bulkPrice1000?: number;
   image: string;
@@ -167,8 +168,10 @@ export interface SelectedProductCustomization {
   paperFinish?: string;
   unit?: string;
   uploadedFileName?: string;
+  uploadedFileNames?: string[];
   uploadedFilePreview?: string;
   uploadedFileUrl?: string;
+  uploadedFileUrls?: string[];
   uploadedFileSize?: number;
   uploadedFileType?: string;
   uploadedIsImage?: boolean;
@@ -231,7 +234,9 @@ export interface Order {
   timeline?: OrderTrackStep[];
   notes?: string;
   uploadedFileUrl?: string;
+  uploadedFileUrls?: string[];
   uploadedFileName?: string;
+  uploadedFileNames?: string[];
   uploadedFileSize?: number;
   uploadedFileType?: string;
   uploadedIsImage?: boolean;

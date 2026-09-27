@@ -63,6 +63,40 @@ async function startServer() {
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
+
+  app.use('/uploads', (req, res, next) => {
+    const rawPath = typeof req.path === 'string' ? req.path : '/';
+    const fileName = decodeURIComponent(path.basename(rawPath));
+    const ext = path.extname(fileName).toLowerCase();
+    const mimeMap: Record<string, string> = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+      '.gif': 'image/gif',
+      '.pdf': 'application/pdf',
+      '.zip': 'application/zip',
+      '.rar': 'application/x-rar-compressed',
+      '.7z': 'application/x-7z-compressed',
+      '.ai': 'application/postscript',
+      '.cdr': 'application/octet-stream',
+      '.psd': 'image/vnd.adobe.photoshop',
+      '.eps': 'application/postscript',
+      '.tif': 'image/tiff',
+      '.tiff': 'image/tiff'
+    };
+
+    const contentType = mimeMap[ext] || 'application/octet-stream';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=86400, must-revalidate');
+
+    const isImage = ['.jpg', '.jpeg', '.png', '.webp', '.svg', '.gif', '.tif', '.tiff'].includes(ext);
+    const disposition = isImage ? 'inline' : `attachment; filename="${fileName.replace(/"/g, '')}"`;
+    res.setHeader('Content-Disposition', disposition);
+    next();
+  });
+
   app.use('/uploads', express.static(uploadsDir, {
     maxAge: '1d',
     etag: true

@@ -94,9 +94,12 @@ export const CheckoutPage: React.FC = () => {
   const [pendingOrderDetails, setPendingOrderDetails] = useState<any>(null);
 
   // File Upload State (IMG, ZIP, PDF, CDR, etc.)
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{ name: string; url: string; size: number; type: string; isImage: boolean }>>([]);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [uploadedFileNames, setUploadedFileNames] = useState<string[]>([]);
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
+  const [uploadedFileUrls, setUploadedFileUrls] = useState<string[]>([]);
   const [uploadedFileSize, setUploadedFileSize] = useState<number | undefined>(undefined);
   const [uploadedIsImage, setUploadedIsImage] = useState<boolean>(false);
   const [uploadedPreviewUrl, setUploadedPreviewUrl] = useState<string | null>(null);
@@ -154,51 +157,93 @@ export const CheckoutPage: React.FC = () => {
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
 
-    setUploadedFile(file);
-    setUploadedFileName(file.name);
-    setUploadedFileSize(file.size);
-    const isImg = file.type.startsWith('image/');
-    setUploadedIsImage(isImg);
-
-    if (isImg) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        if (ev.target?.result) setUploadedPreviewUrl(ev.target.result as string);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setUploadedPreviewUrl(null);
-    }
-
-    // Upload to Express Backend /api/upload
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await apiFetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-      const data = await res.json();
-      if (data.success && data.file) {
-        setUploadedFileUrl(getFullImageUrl(data.file.url));
-        setUploadedIsImage(data.file.isImage);
+      const uploadedList: Array<{ name: string; url: string; size: number; type: string; isImage: boolean }> = [];
+
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await apiFetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+        if (data.success && data.file) {
+          const fileUrl = getFullImageUrl(data.file.url);
+          const isImage = Boolean(data.file.isImage || file.type.startsWith('image/'));
+          uploadedList.push({
+            name: file.name,
+            url: fileUrl,
+            size: file.size,
+            type: file.type || data.file.mimetype || 'application/octet-stream',
+            isImage
+          });
+        }
       }
+
+      if (uploadedList.length > 0) {
+        const mergedFiles = [...uploadedFiles, ...uploadedList];
+        const mergedNames = mergedFiles.map(file => file.name);
+        const mergedUrls = mergedFiles.map(file => file.url);
+        const mergedTotalSize = mergedFiles.reduce((sum, file) => sum + file.size, 0);
+        const firstImage = mergedFiles.find(file => file.isImage) || mergedFiles[0];
+
+        setUploadedFiles(mergedFiles);
+        setUploadedFile(files[0]);
+        setUploadedFileName(mergedNames.join(', '));
+        setUploadedFileNames(mergedNames);
+        setUploadedFileUrl(mergedUrls[0] || null);
+        setUploadedFileUrls(mergedUrls);
+        setUploadedFileSize(mergedTotalSize);
+        setUploadedIsImage(Boolean(firstImage?.isImage));
+
+        if (firstImage?.isImage) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            if (ev.target?.result) setUploadedPreviewUrl(ev.target.result as string);
+          };
+          reader.readAsDataURL(files.find(file => file.type.startsWith('image/')) || files[0]);
+        } else {
+          setUploadedPreviewUrl(null);
+        }
+
+        showToast(`${uploadedList.length} file(s) attached to this order.`, 'success');
+      }
+
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
       console.warn('File upload fallback:', err);
+      showToast('Some files could not be uploaded. Please try again.', 'error');
     } finally {
       setIsUploading(false);
     }
   };
 
-  const removeUploadedFile = () => {
+  const removeUploadedFile = (fileIndex?: number) => {
+    const nextFiles = typeof fileIndex === 'number'
+      ? uploadedFiles.filter((_, idx) => idx !== fileIndex)
+      : [];
+
+    const nextNames = nextFiles.map(file => file.name);
+    const nextUrls = nextFiles.map(file => file.url);
+    const nextImage = nextFiles.find(file => file.isImage) || null;
+
+    setUploadedFiles(nextFiles);
     setUploadedFile(null);
-    setUploadedFileName(null);
-    setUploadedFileUrl(null);
-    setUploadedPreviewUrl(null);
+    setUploadedFileName(nextNames.join(', ') || null);
+    setUploadedFileNames(nextNames);
+    setUploadedFileUrl(nextUrls[0] || null);
+    setUploadedFileUrls(nextUrls);
+    setUploadedFileSize(nextFiles.reduce((sum, file) => sum + file.size, 0) || undefined);
+    setUploadedIsImage(Boolean(nextImage));
+    setUploadedPreviewUrl(nextImage ? nextImage.url : null);
+
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -244,23 +289,28 @@ export const CheckoutPage: React.FC = () => {
     isOrderPlacedRef.current = true;
     setIsSubmitting(true);
     try {
-      const order = placeOrder({
-        fullName,
-        phone,
-        email,
-        companyName,
-        gstin,
-        address,
-        city,
-        pincode,
-        paymentMethod: paymentMethodString,
-        deliveryOption,
-        specialNotes: cashfreeTxnId ? `${specialNotes} | Cashfree Txn: ${cashfreeTxnId}` : specialNotes,
-        uploadedFileUrl,
-        uploadedFileName,
-        uploadedFileSize,
-        uploadedFileType: uploadedFile?.type,
-        uploadedIsImage
+const cartArtwork = cart.find(item => item.customization?.uploadedFileUrl || item.customization?.uploadedFileName);
+    const currentUploadedUrls = uploadedFileUrls.length > 0 ? uploadedFileUrls : (uploadedFileUrl ? [uploadedFileUrl] : []);
+    const currentUploadedNames = uploadedFileNames.length > 0 ? uploadedFileNames : (uploadedFileName ? [uploadedFileName] : []);
+
+    const order = placeOrder({
+      fullName,
+      phone,
+      email,
+      companyName,
+      gstin,
+      address,
+      city,
+      pincode,
+      paymentMethod: paymentMethodString,
+      deliveryOption,
+      specialNotes: cashfreeTxnId ? `${specialNotes} | Cashfree Txn: ${cashfreeTxnId}` : specialNotes,
+      uploadedFileUrl: uploadedFileUrl || currentUploadedUrls[0] || cartArtwork?.customization?.uploadedFileUrl,
+      uploadedFileUrls: currentUploadedUrls.length > 0 ? currentUploadedUrls : (cartArtwork?.customization?.uploadedFileUrls?.length ? cartArtwork.customization.uploadedFileUrls : (cartArtwork?.customization?.uploadedFileUrl ? [cartArtwork.customization.uploadedFileUrl] : [])),
+      uploadedFileName: uploadedFileName || currentUploadedNames[0] || cartArtwork?.customization?.uploadedFileName,
+      uploadedFileNames: currentUploadedNames.length > 0 ? currentUploadedNames : (cartArtwork?.customization?.uploadedFileNames?.length ? cartArtwork.customization.uploadedFileNames : (cartArtwork?.customization?.uploadedFileName ? [cartArtwork.customization.uploadedFileName] : [])),
+      uploadedFileType: uploadedFile?.type || cartArtwork?.customization?.uploadedFileType,
+      uploadedIsImage: uploadedIsImage || cartArtwork?.customization?.uploadedIsImage
       });
 
       showToast('Order confirmed! Generating job slip...', 'success');
@@ -631,7 +681,7 @@ export const CheckoutPage: React.FC = () => {
           {/* 2. Delivery Option */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3">
             <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[11px] font-bold">2</span>
+              <span className="w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[11px] font-bold">3</span>
               <span>{isMarathi ? 'डिलिव्हरी पद्धत' : 'Delivery Method'}</span>
             </h2>
 
@@ -670,94 +720,7 @@ export const CheckoutPage: React.FC = () => {
             </div>
           </div>
 
-          {/* 3. Upload Artwork / Design Files */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[11px] font-bold">3</span>
-                <span>{isMarathi ? 'डिझाईन / इमेज / ZIP फाईल' : 'Upload Design / Artwork / ZIP (Optional)'}</span>
-              </h2>
-              <span className="text-[10px] text-slate-500">Supports CDR, PDF, ZIP, PNG, JPG</span>
-            </div>
-
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              accept=".jpg,.jpeg,.png,.webp,.svg,.zip,.rar,.7z,.pdf,.cdr,.ai,.psd"
-              className="hidden"
-            />
-
-            {uploadedFileName ? (
-              <div className="bg-emerald-50/70 border border-emerald-300 rounded-xl p-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  {uploadedPreviewUrl ? (
-                    <img 
-                      src={uploadedPreviewUrl} 
-                      alt="Order attachment" 
-                      className="w-12 h-12 rounded-lg object-cover border border-emerald-400 shrink-0 bg-white" 
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-lg bg-emerald-100 border border-emerald-300 flex items-center justify-center text-emerald-800 shrink-0">
-                      <FileArchive className="w-5 h-5" />
-                    </div>
-                  )}
-                  <div className="min-w-0 text-xs">
-                    <span className="font-bold text-slate-900 truncate block">{uploadedFileName}</span>
-                    <p className="text-[10px] text-slate-500 mt-0.5">
-                      {uploadedFileSize ? `${Math.round(uploadedFileSize / 1024)} KB` : 'Attached'} • Ready for pre-press verification
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-2.5 py-1 bg-white border border-slate-200 hover:border-slate-300 rounded-lg text-xs font-semibold text-slate-700 cursor-pointer"
-                  >
-                    Change
-                  </button>
-                  <button
-                    type="button"
-                    onClick={removeUploadedFile}
-                    className="p-1 text-slate-400 hover:text-rose-600 rounded-lg cursor-pointer"
-                    title="Remove file"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div
-                onClick={() => !isUploading && fileInputRef.current?.click()}
-                className={`p-4 rounded-xl border-2 border-dashed transition-all cursor-pointer text-center ${
-                  isUploading ? 'bg-rose-50/50 border-rose-400' : 'bg-slate-50 hover:bg-rose-50/30 border-slate-300 hover:border-rose-500'
-                }`}
-              >
-                {isUploading ? (
-                  <div className="flex flex-col items-center justify-center gap-1.5 text-rose-700">
-                    <div className="w-5 h-5 border-2 border-rose-600 border-t-transparent rounded-full animate-spin" />
-                    <span className="text-xs font-bold">Uploading file to server...</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center gap-3">
-                    <UploadCloud className="w-5 h-5 text-rose-600" />
-                    <div className="text-left">
-                      <span className="text-xs font-bold text-slate-900 block">
-                        {isMarathi ? 'प्रिंट डिझाईन फाईल अपलोड करा' : 'Click to Upload Artwork or ZIP File'}
-                      </span>
-                      <p className="text-[10px] text-slate-500">
-                        You can also share files directly on WhatsApp after ordering
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* 4. Payment Option Selection (Featuring Cashfree) */}
+          {/* Payment Option Selection (Featuring Cashfree) */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3">
             <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
               <span className="w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[11px] font-bold">4</span>

@@ -57,6 +57,9 @@ export const AdminProductFormPage: React.FC = () => {
   const [bulkPrice100, setBulkPrice100] = useState<string>(
     existingProduct?.bulkPrice100 !== undefined ? existingProduct.bulkPrice100.toString() : ''
   );
+  const [bulkPrice200, setBulkPrice200] = useState<string>(
+    existingProduct?.bulkPrice200 !== undefined ? existingProduct.bulkPrice200.toString() : ''
+  );
   const [bulkPrice500, setBulkPrice500] = useState<string>(
     existingProduct?.bulkPrice500 !== undefined ? existingProduct.bulkPrice500.toString() : ''
   );
@@ -75,7 +78,7 @@ export const AdminProductFormPage: React.FC = () => {
   const [quantityOptionsStr, setQuantityOptionsStr] = useState<string>(
     existingProduct?.quantityOptions && existingProduct.quantityOptions.length > 0
       ? existingProduct.quantityOptions.join(', ')
-      : '10, 25, 50, 100, 250, 500, 1000'
+      : '10, 25, 50, 100, 200, 250, 500, 1000'
   );
 
   const [turnaround, setTurnaround] = useState<string>(
@@ -187,6 +190,7 @@ export const AdminProductFormPage: React.FC = () => {
       setOriginalPrice(existingProduct.originalPrice ? existingProduct.originalPrice.toString() : Math.round(existingProduct.basePrice * 1.3).toString());
       setSinglePrice(existingProduct.singlePrice !== undefined ? existingProduct.singlePrice.toString() : '');
       setBulkPrice100(existingProduct.bulkPrice100 !== undefined ? existingProduct.bulkPrice100.toString() : '');
+      setBulkPrice200(existingProduct.bulkPrice200 !== undefined ? existingProduct.bulkPrice200.toString() : '');
       setBulkPrice500(existingProduct.bulkPrice500 !== undefined ? existingProduct.bulkPrice500.toString() : '');
       setBulkPrice1000(existingProduct.bulkPrice1000 !== undefined ? existingProduct.bulkPrice1000.toString() : '');
       setIsBestSeller(existingProduct.isBestSeller ?? true);
@@ -195,7 +199,7 @@ export const AdminProductFormPage: React.FC = () => {
       setQuantityOptionsStr(
         existingProduct.quantityOptions && existingProduct.quantityOptions.length > 0
           ? existingProduct.quantityOptions.join(', ')
-          : '10, 25, 50, 100, 250, 500, 1000'
+          : '10, 25, 50, 100, 200, 250, 500, 1000'
       );
       setDescription(existingProduct.description || '');
       setTags(existingProduct.tags || ['Offset', 'Premium']);
@@ -507,6 +511,7 @@ export const AdminProductFormPage: React.FC = () => {
 
     const singlePriceNum = singlePrice.trim() ? parseFloat(singlePrice) : undefined;
     const bulkPrice100Num = bulkPrice100.trim() ? parseFloat(bulkPrice100) : undefined;
+    const bulkPrice200Num = bulkPrice200.trim() ? parseFloat(bulkPrice200) : undefined;
     const bulkPrice500Num = bulkPrice500.trim() ? parseFloat(bulkPrice500) : undefined;
     const bulkPrice1000Num = bulkPrice1000.trim() ? parseFloat(bulkPrice1000) : undefined;
     const originalPriceNum = originalPrice.trim() ? parseFloat(originalPrice) : Math.round(basePriceNum * 1.3);
@@ -522,13 +527,14 @@ export const AdminProductFormPage: React.FC = () => {
       originalPrice: originalPriceNum,
       singlePrice: singlePriceNum,
       bulkPrice100: bulkPrice100Num,
+      bulkPrice200: bulkPrice200Num,
       bulkPrice500: bulkPrice500Num,
       bulkPrice1000: bulkPrice1000Num,
       isBestSeller,
       isPopular: true,
       minQuantity: minQtyNum,
       defaultQuantity: defaultQtyNum,
-      quantityOptions: parsedQtyOptions.length > 0 ? parsedQtyOptions : [10, 25, 50, 100, 250, 500, 1000],
+      quantityOptions: parsedQtyOptions.length > 0 ? parsedQtyOptions : [10, 25, 50, 100, 200, 250, 500, 1000],
       description: description.trim(),
       tags,
       image: mainImage,
@@ -1346,7 +1352,7 @@ export const AdminProductFormPage: React.FC = () => {
                     </label>
                     <input
                       type="text"
-                      placeholder="10, 25, 50, 100, 250, 500, 1000"
+                      placeholder="10, 25, 50, 100, 200, 250, 500, 1000"
                       value={quantityOptionsStr}
                       onChange={(e) => setQuantityOptionsStr(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 font-bold focus:outline-none focus:border-[#FF0038]"
@@ -1365,11 +1371,11 @@ export const AdminProductFormPage: React.FC = () => {
                       Single Piece & Bulk Tier Exact Pricing
                     </span>
                     <p className="text-[11px] text-slate-600 mt-0.5">
-                      Fixed rates applied automatically when a customer picks 1, 100, 500, or 1000 units.
+                      Fixed rates applied automatically when a customer picks 1, 100, 200, 500, or 1000 units.
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                     <div className="space-y-1">
                       <label className="text-[11px] font-bold text-slate-700 block">Single Unit (₹)</label>
                       <div className="relative">
@@ -1399,6 +1405,21 @@ export const AdminProductFormPage: React.FC = () => {
                         />
                       </div>
                       <span className="text-[10px] text-emerald-600 font-medium">Applied at 100 qty</span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 block">200 Qty Total (₹)</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400">₹</span>
+                        <input
+                          type="number"
+                          placeholder="e.g. 650"
+                          value={bulkPrice200}
+                          onChange={(e) => setBulkPrice200(e.target.value)}
+                          className="w-full pl-7 pr-3 py-2 rounded-xl bg-white border border-slate-200 focus:border-[#FF0038] text-xs text-slate-900 focus:outline-none font-bold"
+                        />
+                      </div>
+                      <span className="text-[10px] text-emerald-600 font-medium">Applied at 200 qty</span>
                     </div>
 
                     <div className="space-y-1">

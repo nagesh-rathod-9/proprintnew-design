@@ -5,6 +5,7 @@ import { CategoryGrid } from '../components/CategoryGrid';
 import { BestSellingGrid } from '../components/BestSellingGrid';
 import { TrustBadges } from '../components/TrustBadges';
 import { GraphicDesignPortfolio } from '../components/GraphicDesignPortfolio';
+import { OurServicesShowcase } from '../components/OurServicesShowcase';
 import { ClientReviewsSection } from '../components/ClientReviewsSection';
 import { CallToActionBanner } from '../components/CallToActionBanner';
 import { Product } from '../types';
@@ -51,10 +52,16 @@ export const HomePage: React.FC<HomePageProps> = ({
         onOpenQuoteModal={onOpenQuoteModal}
       />
 
-      {/* 6. What Our Customers Say (Testimonials) */}
+      {/* 6. Services after Design Works */}
+      <OurServicesShowcase
+        onOpenWhatsApp={onOpenWhatsApp}
+        onOpenQuoteModal={onOpenQuoteModal}
+      />
+
+      {/* 7. What Our Customers Say (Testimonials) */}
       <ClientReviewsSection />
 
-      {/* 7. Ready to Bring Your Ideas to Print? (Navy CTA Banner) */}
+      {/* 8. Ready to Bring Your Ideas to Print? (Navy CTA Banner) */}
       <CallToActionBanner 
         onOpenQuoteModal={() => onOpenQuoteModal()} 
       />

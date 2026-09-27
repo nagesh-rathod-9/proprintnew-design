@@ -599,6 +599,7 @@ export const AdminUserDetailsModal: React.FC<AdminUserDetailsModalProps> = ({
                           </div>
                           <a
                             href={ord.uploadedFileUrl}
+                            download={ord.uploadedFileName || 'artwork'}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-[#FF0038] hover:text-rose-700 font-bold text-xs"

@@ -87,10 +87,12 @@ uploadRouter.post('/', uploadLimiter, (req: Request, res: Response) => {
       success: true,
       message: 'File uploaded successfully',
       url: fileUrl,
+      downloadName: req.file.originalname,
       file: {
         url: fileUrl,
         filename: req.file.filename,
         originalName: req.file.originalname,
+        downloadName: req.file.originalname,
         size: req.file.size,
         mimetype: req.file.mimetype,
         extension: ext,

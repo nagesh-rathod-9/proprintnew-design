@@ -319,6 +319,7 @@ export const AdminOrderDetailPage: React.FC = () => {
                       {(custom.uploadedFileUrl || custom.uploadedFilePreview) && (
                         <a
                           href={custom.uploadedFileUrl || custom.uploadedFilePreview}
+                          download={custom.uploadedFileName || 'custom-artwork'}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 rounded-lg text-xs font-semibold shrink-0"

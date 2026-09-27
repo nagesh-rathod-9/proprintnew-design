@@ -553,139 +553,183 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return result as T;
   };
 
+  const readLocalCache = <T,>(key: string, fallback: T): T => {
+    try {
+      const stored = localStorage.getItem(key);
+      if (!stored) return fallback;
+      const parsed = JSON.parse(stored) as T;
+      return parsed ?? fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const writeLocalCache = <T,>(key: string, value: T) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      // Ignore quota/storage issues gracefully
+    }
+  };
+
   // ================================================================
   // Data fetching function (with cache‑busting via apiFetch and image transformation)
   // ================================================================
   const fetchAllInitialData = async () => {
     try {
-      // Fetch users
-      const usersRes = await apiFetch('/api/users');
-      if (usersRes.ok) {
-        const uData = await usersRes.json();
-        if (uData.success && Array.isArray(uData.users)) {
-          // Users usually don't have images, but we can keep as is
-          setUsers(uData.users);
+      const cachedProducts = readLocalCache<Product[]>('proprint_cache_products', []);
+      const cachedCategories = readLocalCache<Category[]>('proprint_cache_categories', []);
+      const cachedHeroSlides = readLocalCache<HeroSlide[]>('proprint_cache_heroSlides', []);
+      const cachedServices = readLocalCache<ServiceItem[]>('proprint_cache_services', []);
+      const cachedPortfolio = readLocalCache<PortfolioItem[]>('proprint_cache_portfolio', []);
+      const cachedOrders = readLocalCache<Order[]>('proprint_cache_orders', []);
+      const cachedReviews = readLocalCache<ReviewRecord[]>('proprint_cache_reviews', []);
+      const cachedQuotes = readLocalCache<QuoteRequest[]>('proprint_cache_quotes', []);
+      const cachedPayments = readLocalCache<PaymentRecord[]>('proprint_cache_payments', []);
+      const cachedUsers = readLocalCache<User[]>('proprint_cache_users', []);
 
-          const savedUser = localStorage.getItem('proprint_user');
-          if (savedUser) {
-            try {
-              const parsed = JSON.parse(savedUser);
-              const matched = uData.users.find((u: User) => u.id === parsed.id || u.email === parsed.email || u.phone === parsed.phone);
-              if (matched) {
-                setCurrentUser(matched);
-                localStorage.setItem('proprint_user', JSON.stringify(matched));
-              }
-            } catch (_e) { }
-          }
-        }
-      }
+      if (cachedProducts.length) setProducts(cachedProducts);
+      if (cachedCategories.length) setCategories(cachedCategories);
+      if (cachedHeroSlides.length) setHeroSlides(cachedHeroSlides);
+      if (cachedServices.length) setServices(cachedServices);
+      if (cachedPortfolio.length) setPortfolio(cachedPortfolio);
+      if (cachedOrders.length) setOrders(cachedOrders);
+      if (cachedReviews.length) setReviews(cachedReviews);
+      if (cachedQuotes.length) setQuotes(cachedQuotes);
+      if (cachedPayments.length) setPayments(cachedPayments);
+      if (cachedUsers.length) setUsers(cachedUsers);
 
-      // Fetch products with image transformation
-      const prodRes = await apiFetch('/api/products');
-      if (prodRes.ok) {
-        const pData = await prodRes.json();
-        if (pData.success && Array.isArray(pData.products)) {
-          const transformedProducts = pData.products.map((p: Product) => transformImageUrls(p));
-          setProducts(transformedProducts);
-        }
-      }
+      const requests = [
+        apiFetch('/api/users').then(async res => {
+          if (!res.ok) return;
+          const uData = await res.json();
+          if (uData.success && Array.isArray(uData.users)) {
+            setUsers(uData.users);
+            writeLocalCache('proprint_cache_users', uData.users);
 
-      // Fetch categories with image transformation
-      const catRes = await apiFetch('/api/categories');
-      if (catRes.ok) {
-        const cData = await catRes.json();
-        if (cData.success && Array.isArray(cData.categories)) {
-          const transformedCategories = cData.categories.map((c: Category) => transformImageUrls(c));
-          setCategories(transformedCategories);
-        }
-      }
-
-      // Fetch orders
-      const ordRes = await apiFetch('/api/orders');
-      if (ordRes.ok) {
-        const oData = await ordRes.json();
-        if (oData.success && Array.isArray(oData.orders)) {
-          setOrders(oData.orders);
-        }
-      }
-
-      // Sync with Firestore orders backup if available
-      try {
-        if (db) {
-          const ordSnap = await getDocs(collection(db, 'orders'));
-          if (!ordSnap.empty) {
-            const fsOrders: Order[] = [];
-            ordSnap.forEach(d => {
-              if (d.data()) fsOrders.push({ id: d.id, ...d.data() } as Order);
-            });
-            if (fsOrders.length > 0) {
-              setOrders(prev => {
-                const map = new Map<string, Order>();
-                [...fsOrders, ...prev].forEach(o => map.set(o.id, o));
-                return Array.from(map.values());
-              });
+            const savedUser = localStorage.getItem('proprint_user');
+            if (savedUser) {
+              try {
+                const parsed = JSON.parse(savedUser);
+                const matched = uData.users.find((u: User) => u.id === parsed.id || u.email === parsed.email || u.phone === parsed.phone);
+                if (matched) {
+                  setCurrentUser(matched);
+                  localStorage.setItem('proprint_user', JSON.stringify(matched));
+                }
+              } catch (_e) { }
             }
           }
-        }
-      } catch (_fsErr) {
-        // Firestore offline or not configured, ignore gracefully
-      }
+        }),
 
-      // Fetch hero slides with image transformation
-      const slidesRes = await apiFetch('/api/hero-slides');
-      if (slidesRes.ok) {
-        const sData = await slidesRes.json();
-        if (sData.success && Array.isArray(sData.slides)) {
-          const transformedSlides = sData.slides.map((s: HeroSlide) => transformImageUrls(s));
-          setHeroSlides(transformedSlides);
-        }
-      }
+        apiFetch('/api/products').then(async res => {
+          if (!res.ok) return;
+          const pData = await res.json();
+          if (pData.success && Array.isArray(pData.products)) {
+            const transformedProducts = pData.products.map((p: Product) => transformImageUrls(p));
+            setProducts(transformedProducts);
+            writeLocalCache('proprint_cache_products', transformedProducts);
+          }
+        }),
 
-      // Fetch reviews
-      const revRes = await apiFetch('/api/reviews');
-      if (revRes.ok) {
-        const rData = await revRes.json();
-        if (rData.success && Array.isArray(rData.reviews)) {
-          setReviews(rData.reviews);
-        }
-      }
+        apiFetch('/api/categories').then(async res => {
+          if (!res.ok) return;
+          const cData = await res.json();
+          if (cData.success && Array.isArray(cData.categories)) {
+            const transformedCategories = cData.categories.map((c: Category) => transformImageUrls(c));
+            setCategories(transformedCategories);
+            writeLocalCache('proprint_cache_categories', transformedCategories);
+          }
+        }),
 
-      // Fetch quotes
-      const qRes = await apiFetch('/api/quotes');
-      if (qRes.ok) {
-        const qData = await qRes.json();
-        if (qData.success && Array.isArray(qData.quotes)) {
-          setQuotes(qData.quotes);
-        }
-      }
+        apiFetch('/api/orders').then(async res => {
+          if (!res.ok) return;
+          const oData = await res.json();
+          if (oData.success && Array.isArray(oData.orders)) {
+            setOrders(oData.orders);
+            writeLocalCache('proprint_cache_orders', oData.orders);
+          }
+        }),
 
-      // Fetch payments
-      const payRes = await apiFetch('/api/payments');
-      if (payRes.ok) {
-        const pData = await payRes.json();
-        if (pData.success && Array.isArray(pData.payments)) {
-          setPayments(pData.payments);
-        }
-      }
+        (async () => {
+          try {
+            if (!db) return;
+            const ordSnap = await getDocs(collection(db, 'orders'));
+            if (!ordSnap.empty) {
+              const fsOrders: Order[] = [];
+              ordSnap.forEach(d => {
+                if (d.data()) fsOrders.push({ id: d.id, ...d.data() } as Order);
+              });
+              if (fsOrders.length > 0) {
+                setOrders(prev => {
+                  const map = new Map<string, Order>();
+                  [...fsOrders, ...prev].forEach(o => map.set(o.id, o));
+                  return Array.from(map.values());
+                });
+              }
+            }
+          } catch (_fsErr) {
+            // Firestore offline or not configured, ignore gracefully
+          }
+        })(),
 
-      // Fetch services
-      const srvRes = await apiFetch('/api/services');
-      if (srvRes.ok) {
-        const sData = await srvRes.json();
-        if (sData.success && Array.isArray(sData.services)) {
-          setServices(sData.services);
-        }
-      }
+        apiFetch('/api/hero-slides').then(async res => {
+          if (!res.ok) return;
+          const sData = await res.json();
+          if (sData.success && Array.isArray(sData.slides)) {
+            const transformedSlides = sData.slides.map((s: HeroSlide) => transformImageUrls(s));
+            setHeroSlides(transformedSlides);
+            writeLocalCache('proprint_cache_heroSlides', transformedSlides);
+          }
+        }),
 
-      // Fetch portfolio with image transformation
-      const portRes = await apiFetch('/api/portfolio');
-      if (portRes.ok) {
-        const portData = await portRes.json();
-        if (portData.success && Array.isArray(portData.portfolio)) {
-          const transformedPortfolio = portData.portfolio.map((p: PortfolioItem) => transformImageUrls(p));
-          setPortfolio(transformedPortfolio);
-        }
-      }
+        apiFetch('/api/reviews').then(async res => {
+          if (!res.ok) return;
+          const rData = await res.json();
+          if (rData.success && Array.isArray(rData.reviews)) {
+            setReviews(rData.reviews);
+            writeLocalCache('proprint_cache_reviews', rData.reviews);
+          }
+        }),
+
+        apiFetch('/api/quotes').then(async res => {
+          if (!res.ok) return;
+          const qData = await res.json();
+          if (qData.success && Array.isArray(qData.quotes)) {
+            setQuotes(qData.quotes);
+            writeLocalCache('proprint_cache_quotes', qData.quotes);
+          }
+        }),
+
+        apiFetch('/api/payments').then(async res => {
+          if (!res.ok) return;
+          const pData = await res.json();
+          if (pData.success && Array.isArray(pData.payments)) {
+            setPayments(pData.payments);
+            writeLocalCache('proprint_cache_payments', pData.payments);
+          }
+        }),
+
+        apiFetch('/api/services').then(async res => {
+          if (!res.ok) return;
+          const sData = await res.json();
+          if (sData.success && Array.isArray(sData.services)) {
+            setServices(sData.services);
+            writeLocalCache('proprint_cache_services', sData.services);
+          }
+        }),
+
+        apiFetch('/api/portfolio').then(async res => {
+          if (!res.ok) return;
+          const portData = await res.json();
+          if (portData.success && Array.isArray(portData.portfolio)) {
+            const transformedPortfolio = portData.portfolio.map((p: PortfolioItem) => transformImageUrls(p));
+            setPortfolio(transformedPortfolio);
+            writeLocalCache('proprint_cache_portfolio', transformedPortfolio);
+          }
+        })
+      ];
+
+      await Promise.allSettled(requests);
     } catch (err) {
       console.warn('Initial data synchronization notice:', err);
     }
@@ -693,8 +737,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Fetch data on mount
   useEffect(() => {
-    fetchAllInitialData();
+    void fetchAllInitialData();
   }, []);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      void fetchAllInitialData();
+    }
+  }, [currentUser?.id, currentUser?.role]);
 
   // ================================================================
   // NEW: refreshAllData and app resume listener
@@ -756,6 +806,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       originalPrice:
         prodData.originalPrice ||
         Math.round((Number(prodData.basePrice) || 299) * 1.3),
+      singlePrice: prodData.singlePrice,
+      bulkPrice100: prodData.bulkPrice100,
+      bulkPrice200: prodData.bulkPrice200,
+      bulkPrice500: prodData.bulkPrice500,
+      bulkPrice1000: prodData.bulkPrice1000,
       description:
         prodData.description ||
         'High quality professional printing with premium finish and vivid CMYK color fidelity.',
@@ -769,7 +824,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       minQuantity: prodData.minQuantity || 100,
       defaultQuantity: prodData.defaultQuantity || 500,
       quantityOptions:
-        prodData.quantityOptions || [100, 250, 500, 1000, 2000, 5000],
+        prodData.quantityOptions || [100, 200, 250, 500, 1000, 2000, 5000],
       sizes:
         prodData.sizes || [
           {
@@ -2542,6 +2597,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       hour12: true
     });
 
+    const cartArtwork = cartItems.find(i => i.customization?.uploadedFileUrl || i.customization?.uploadedFileName);
+    const uploadedFileUrls = orderData.uploadedFileUrls?.length
+      ? orderData.uploadedFileUrls
+      : (orderData.uploadedFileUrl ? [orderData.uploadedFileUrl] : (cartArtwork?.customization?.uploadedFileUrls?.length ? cartArtwork.customization.uploadedFileUrls : (cartArtwork?.customization?.uploadedFileUrl ? [cartArtwork.customization.uploadedFileUrl] : [])));
+    const uploadedFileNames = orderData.uploadedFileNames?.length
+      ? orderData.uploadedFileNames
+      : (orderData.uploadedFileName ? [orderData.uploadedFileName] : (cartArtwork?.customization?.uploadedFileNames?.length ? cartArtwork.customization.uploadedFileNames : (cartArtwork?.customization?.uploadedFileName ? [cartArtwork.customization.uploadedFileName] : [])));
+
     const newOrder: Order = {
       id: `ord-${Date.now()}`,
       orderNumber: `PRP-${Math.floor(10000 + Math.random() * 90000)}`,
@@ -2564,8 +2627,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       status: 'Order Placed',
       createdAt: orderDateStr,
       estimatedDelivery: '3-4 Days',
-      uploadedFileUrl: orderData.uploadedFileUrl || cartItems.find(i => i.customization?.uploadedFileUrl)?.customization?.uploadedFileUrl,
-      uploadedFileName: orderData.uploadedFileName || cartItems.find(i => i.customization?.uploadedFileName)?.customization?.uploadedFileName,
+      uploadedFileUrl: uploadedFileUrls[0] || undefined,
+      uploadedFileUrls: uploadedFileUrls.length > 0 ? uploadedFileUrls : undefined,
+      uploadedFileName: uploadedFileNames[0] || undefined,
+      uploadedFileNames: uploadedFileNames.length > 0 ? uploadedFileNames : undefined,
       uploadedFileSize: orderData.uploadedFileSize,
       uploadedFileType: orderData.uploadedFileType,
       uploadedIsImage: orderData.uploadedIsImage,
@@ -2657,7 +2722,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         timeline: newOrder.timeline,
         notes: newOrder.notes,
         uploadedFileUrl: newOrder.uploadedFileUrl,
-        uploadedFileName: newOrder.uploadedFileName
+        uploadedFileUrls: newOrder.uploadedFileUrls,
+        uploadedFileName: newOrder.uploadedFileName,
+        uploadedFileNames: newOrder.uploadedFileNames
       })
     }).catch(err => console.warn('Order API sync error:', err));
 

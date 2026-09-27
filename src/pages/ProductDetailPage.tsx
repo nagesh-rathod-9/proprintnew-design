@@ -140,20 +140,15 @@ export const ProductDetailPage: React.FC = () => {
   const quantityTiers = useMemo(() => {
     let baseTiers = product.quantityOptions && product.quantityOptions.length > 0
       ? [...product.quantityOptions]
-      : [100, 250, 500, 1000, 2000, 5000];
+      : [100, 200, 250, 500, 1000, 2000, 5000];
 
     if (product.singlePrice && !baseTiers.includes(1)) {
       baseTiers = [1, ...baseTiers];
     }
-    if (product.bulkPrice100 && !baseTiers.includes(100)) {
-      baseTiers.push(100);
-    }
-    if (product.bulkPrice500 && !baseTiers.includes(500)) {
-      baseTiers.push(500);
-    }
-    if (product.bulkPrice1000 && !baseTiers.includes(1000)) {
-      baseTiers.push(1000);
-    }
+    if (!baseTiers.includes(100)) baseTiers.push(100);
+    if (!baseTiers.includes(200)) baseTiers.push(200);
+    if (!baseTiers.includes(500)) baseTiers.push(500);
+    if (!baseTiers.includes(1000)) baseTiers.push(1000);
 
     return Array.from(new Set(baseTiers)).sort((a, b) => a - b);
   }, [product]);
@@ -164,8 +159,11 @@ export const ProductDetailPage: React.FC = () => {
 
   // File Upload State
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [uploadedFileNames, setUploadedFileNames] = useState<string[]>([]);
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
+  const [uploadedFileUrls, setUploadedFileUrls] = useState<string[]>([]);
   const [uploadedFileSize, setUploadedFileSize] = useState<number | undefined>(undefined);
+  const [uploadedPreviewUrl, setUploadedPreviewUrl] = useState<string | null>(null);
   const [uploadedIsImage, setUploadedIsImage] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'features' | 'specs' | 'delivery' | 'reviews'>('features');
@@ -187,6 +185,10 @@ export const ProductDetailPage: React.FC = () => {
     rawBaseTotal = product.bulkPrice100;
     isBulkRateActive = true;
     bulkDiscountLabel = '100 Qty Bulk Rate Applied';
+  } else if (selectedQuantity === 200 && product.bulkPrice200) {
+    rawBaseTotal = product.bulkPrice200;
+    isBulkRateActive = true;
+    bulkDiscountLabel = '200 Qty Bulk Rate Applied';
   } else if (selectedQuantity === 500 && product.bulkPrice500) {
     rawBaseTotal = product.bulkPrice500;
     isBulkRateActive = true;
@@ -203,6 +205,10 @@ export const ProductDetailPage: React.FC = () => {
     rawBaseTotal = (product.bulkPrice500 / 500) * selectedQuantity;
     isBulkRateActive = true;
     bulkDiscountLabel = '500+ Volume Tier Applied';
+  } else if (selectedQuantity >= 200 && product.bulkPrice200) {
+    rawBaseTotal = (product.bulkPrice200 / 200) * selectedQuantity;
+    isBulkRateActive = true;
+    bulkDiscountLabel = '200+ Volume Tier Applied';
   } else if (selectedQuantity >= 100 && product.bulkPrice100) {
     rawBaseTotal = (product.bulkPrice100 / 100) * selectedQuantity;
     isBulkRateActive = true;
@@ -259,7 +265,9 @@ Hello Proprint Team, please confirm this order, share the digital proof, and pro
       calculatedPrice,
       turnaroundDays: product.turnaroundDays || 1,
       uploadedFileName: uploadedFileName || undefined,
+      uploadedFileNames: uploadedFileNames.length > 0 ? uploadedFileNames : undefined,
       uploadedFileUrl: uploadedFileUrl || undefined,
+      uploadedFileUrls: uploadedFileUrls.length > 0 ? uploadedFileUrls : undefined,
       uploadedFileSize,
       uploadedIsImage,
       specialInstructions: `${selectedFinish.name} • ${selectedSize.name}${uploadedFileName ? ` • Artwork: ${uploadedFileName}` : ''}`
@@ -277,32 +285,56 @@ Hello Proprint Team, please confirm this order, share the digital proof, and pro
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setUploadedFileName(file.name);
-      setUploadedFileSize(file.size);
-      const isImg = file.type.startsWith('image/');
-      setUploadedIsImage(isImg);
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-      setIsUploading(true);
-      try {
+    const firstImageFile = files.find((file) => file.type.startsWith('image/')) || files[0];
+    const fileNames = files.map((file) => file.name).join(', ');
+    const fileNameList = files.map((file) => file.name);
+    setUploadedFileName(fileNames);
+    setUploadedFileNames(fileNameList);
+    setUploadedFileSize(files.reduce((sum, file) => sum + file.size, 0));
+    setUploadedIsImage(firstImageFile.type.startsWith('image/'));
+
+    if (firstImageFile.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        if (ev.target?.result) setUploadedPreviewUrl(ev.target.result as string);
+      };
+      reader.readAsDataURL(firstImageFile);
+    } else {
+      setUploadedPreviewUrl(null);
+    }
+
+    setIsUploading(true);
+    try {
+      const uploadedUrls: string[] = [];
+
+      for (const file of files) {
         const formData = new FormData();
         formData.append('file', file);
+
         const res = await apiFetch('/api/upload', {
           method: 'POST',
           body: formData,
         });
+
         const data = await res.json();
         if (data.success && data.file) {
-          setUploadedFileUrl(getFullImageUrl(data.file.url));
-          setUploadedIsImage(data.file.isImage);
-          showToast(`File "${file.name}" saved to /uploads on press server!`, 'success');
+          uploadedUrls.push(getFullImageUrl(data.file.url));
         }
-      } catch (err) {
-        console.warn('Upload fallback:', err);
-      } finally {
-        setIsUploading(false);
       }
+
+      if (uploadedUrls.length > 0) {
+        setUploadedFileUrls(uploadedUrls);
+        setUploadedFileUrl(uploadedUrls[0]);
+        setUploadedIsImage(uploadedUrls[0].match(/\.(jpg|jpeg|png|webp|svg)$/i) !== null);
+        showToast(`${files.length} file(s) saved to /uploads on press server!`, 'success');
+      }
+    } catch (err) {
+      console.warn('Upload fallback:', err);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -651,6 +683,8 @@ Hello Proprint Team, please confirm this order, share the digital proof, and pro
                     customBadge = `₹${product.singlePrice}`;
                   } else if (q === 100 && product.bulkPrice100) {
                     customBadge = `₹${product.bulkPrice100}`;
+                  } else if (q === 200 && product.bulkPrice200) {
+                    customBadge = `₹${product.bulkPrice200}`;
                   } else if (q === 500 && product.bulkPrice500) {
                     customBadge = `₹${product.bulkPrice500}`;
                   } else if (q === 1000 && product.bulkPrice1000) {
@@ -733,15 +767,20 @@ Hello Proprint Team, please confirm this order, share the digital proof, and pro
                     <span className="text-xs font-bold text-slate-900 block truncate">
                       {uploadedFileName ? uploadedFileName : 'Attach Ready Print Artwork (Optional)'}
                     </span>
-                    <span className="text-[10px] text-slate-400">PDF, AI, CDR, PSD or ZIP up to 100MB</span>
+                    <span className="text-[10px] text-slate-400">
+                      {uploadedFileName
+                        ? `${uploadedFileNames.length || 1} file${(uploadedFileNames.length || 1) > 1 ? 's' : ''} attached • Add more`
+                        : 'PDF, AI, CDR, PSD or ZIP up to 100MB'}
+                    </span>
                   </div>
                 </div>
                 <span className="px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 rounded-lg text-xs font-bold text-slate-700 shrink-0">
-                  {uploadedFileName ? 'Change' : 'Browse'}
+                  {uploadedFileName ? 'Attach more' : 'Browse'}
                 </span>
                 <input
                   type="file"
-                  accept=".pdf,.ai,.cdr,.psd,.zip,.png,.jpg"
+                  multiple
+                  accept=".pdf,.ai,.cdr,.psd,.zip,.rar,.7z,.png,.jpg,.jpeg,.webp,.svg"
                   onChange={handleFileUpload}
                   className="hidden"
                 />

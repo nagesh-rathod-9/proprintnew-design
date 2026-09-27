@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Package, 
@@ -30,7 +30,7 @@ import {
   Phone,
   ShieldCheck
 } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { apiFetch, getFullImageUrl, useApp } from '../context/AppContext';
 import { Order, OrderStatus } from '../types';
 import { WhatsAppModal } from '../components/WhatsAppModal';
 import { Breadcrumbs } from '../components/Breadcrumbs';
@@ -47,6 +47,8 @@ export const UserOrdersPage: React.FC = () => {
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<Order | null>(null);
   const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [designReplacements, setDesignReplacements] = useState<Record<string, { name: string; url: string }>>({});
+  const designInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   // Filter user-specific orders
   const userOrders = useMemo(() => {
@@ -80,6 +82,53 @@ export const UserOrdersPage: React.FC = () => {
       return matchesSearch && matchesStatus;
     });
   }, [orders, currentUser, searchQuery, statusFilter]);
+
+  const handleSeeDesign = (order: Order) => {
+    const design = designReplacements[order.id] || (order.uploadedFileUrl ? { name: order.uploadedFileName || 'uploaded-design', url: order.uploadedFileUrl } : null);
+    if (!design?.url) {
+      showToast('No uploaded design found for this order.', 'info');
+      return;
+    }
+    window.open(design.url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleReplaceDesign = async (orderId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await apiFetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+
+      if (!data.success || !data.file) {
+        throw new Error('Upload failed');
+      }
+
+      const fileUrl = getFullImageUrl(data.file.url);
+      setDesignReplacements((prev) => ({
+        ...prev,
+        [orderId]: {
+          name: file.name,
+          url: fileUrl
+        }
+      }));
+
+      showToast('Uploaded design updated successfully.', 'success');
+    } catch (error) {
+      console.warn('Replace design upload failed:', error);
+      showToast('Could not replace the uploaded design. Please try again.', 'error');
+    } finally {
+      if (designInputRefs.current[orderId]) {
+        designInputRefs.current[orderId]!.value = '';
+      }
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -390,8 +439,40 @@ export const UserOrdersPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Action Buttons: Live Track & View Details */}
-                  <div className="flex items-center gap-2 ml-auto">
+                  {/* Action Buttons: Live Track, Design Actions & View Details */}
+                  <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">
+                    {(designReplacements[ord.id]?.url || ord.uploadedFileUrl) && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleSeeDesign(ord)}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[10px] transition-all cursor-pointer active:scale-95"
+                        >
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          <span>{isMarathi ? 'डिझाईन पहा' : 'See Design'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => designInputRefs.current[ord.id]?.click()}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full border border-rose-200 bg-white hover:bg-rose-50 text-[#FF0038] font-bold text-[10px] transition-all cursor-pointer active:scale-95"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>{isMarathi ? 'डिझाईन बदला' : 'Change Design'}</span>
+                        </button>
+
+                        <input
+                          ref={(el) => {
+                            designInputRefs.current[ord.id] = el;
+                          }}
+                          type="file"
+                          accept=".jpg,.jpeg,.png,.webp,.svg,.gif,.pdf,.ai,.cdr,.psd,.zip,.rar,.7z,.tif,.tiff"
+                          className="hidden"
+                          onChange={(e) => handleReplaceDesign(ord.id, e)}
+                        />
+                      </>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => setTrackingOrder(ord)}
@@ -487,15 +568,44 @@ export const UserOrdersPage: React.FC = () => {
               </div>
 
               {/* Attached Artwork / File */}
-              {selectedOrderDetails.uploadedFileName && (
-                <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs">
+              {(designReplacements[selectedOrderDetails.id]?.url || selectedOrderDetails.uploadedFileUrl || selectedOrderDetails.uploadedFileName) && (
+                <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-2 truncate">
                     <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
                     <span className="font-bold text-slate-900 truncate">
-                      {selectedOrderDetails.uploadedFileName}
+                      {designReplacements[selectedOrderDetails.id]?.name || selectedOrderDetails.uploadedFileName || 'Uploaded design'}
                     </span>
                   </div>
-                  <span className="text-[10px] font-bold text-emerald-700 shrink-0">✓ Pre-Press Verified</span>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => handleSeeDesign(selectedOrderDetails)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-emerald-200 text-emerald-700 font-bold text-[10px] hover:bg-emerald-100 transition-colors cursor-pointer"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5" />
+                      <span>{isMarathi ? 'डिझाईन पहा' : 'See Design'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => designInputRefs.current[selectedOrderDetails.id]?.click()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-rose-200 text-[#FF0038] font-bold text-[10px] hover:bg-rose-50 transition-colors cursor-pointer"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>{isMarathi ? 'बदला' : 'Change'}</span>
+                    </button>
+
+                    <input
+                      ref={(el) => {
+                        designInputRefs.current[selectedOrderDetails.id] = el;
+                      }}
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp,.svg,.gif,.pdf,.ai,.cdr,.psd,.zip,.rar,.7z,.tif,.tiff"
+                      className="hidden"
+                      onChange={(e) => handleReplaceDesign(selectedOrderDetails.id, e)}
+                    />
+                  </div>
                 </div>
               )}
 
