@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutGrid, Sparkles } from 'lucide-react';
+import { LayoutGrid, Package, Sparkles } from 'lucide-react';
 import { CategoryId } from '../types';
 import { useApp } from '../context/AppContext';
 
@@ -95,12 +95,16 @@ export const QuickCategories: React.FC<QuickCategoriesProps> = ({
               >
                 {/* Micro thumbnail */}
                 <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200 bg-slate-100 shadow-2xs">
-                  <img
-                    src={cat.image}
-                    alt={cat.name}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover"
-                  />
+                  {cat.image ? (
+                    <img
+                      src={cat.image}
+                      alt={cat.name}
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Package className="m-auto h-4 w-4 text-slate-400" aria-hidden="true" />
+                  )}
                 </div>
 
                 {/* Category Label & Subtitle */}

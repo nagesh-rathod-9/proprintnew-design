@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ChevronRight } from 'lucide-react';
+import { ArrowRight, ChevronRight, Package } from 'lucide-react';
 import { Category, CategoryId } from '../types';
 import { apiFetch, getFullImageUrl, useApp } from '../context/AppContext';
 
@@ -23,12 +23,10 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({
         const data = await response.json();
         const categories = Array.isArray(data.categories) ? data.categories : [];
         setApiCategories(
-          categories
-            .filter((category: Category) => category.image)
-            .map((category: Category) => ({
-              ...category,
-              image: getFullImageUrl(category.image)
-            }))
+          categories.map((category: Category) => ({
+            ...category,
+            image: category.image ? getFullImageUrl(category.image) : ''
+          }))
         );
       })
       .catch(() => setApiCategories([]));
@@ -101,12 +99,16 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({
             >
               {/* Image Box */}
               <div className="w-full aspect-[4/3] rounded-lg overflow-hidden bg-slate-50 mb-3 flex items-center justify-center border border-slate-100">
-                <img
-                  src={item.image}
-                  alt={item.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  referrerPolicy="no-referrer"
-                />
+                {item.image ? (
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <Package className="h-8 w-8 text-slate-400" aria-hidden="true" />
+                )}
               </div>
 
               {/* Title & Count */}

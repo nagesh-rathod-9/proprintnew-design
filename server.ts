@@ -1,12 +1,10 @@
+import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import compression from 'compression';
 import { createServer as createViteServer } from 'vite';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 // Database & Core
 import { initializeDatabase, closeDb } from './server/db.js';
@@ -48,18 +46,29 @@ async function startServer() {
   app.use(securityHeaders);
   app.use(requestLogger);
 
-  const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173').split(',').map((value) => value.trim()).filter(Boolean);
-  app.use(cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-        return;
-      }
-      callback(new Error(`Origin ${origin} is not allowed by CORS.`));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
-  }));
+  // Allowed browser origins. In production set ALLOWED_ORIGINS=https://yourdomain.com
+  const defaultDevOrigins =
+    'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173';
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || defaultDevOrigins)
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  app.use(
+    cors<Request>((req, callback) => {
+      const origin = req.header('Origin');
+      // Same-origin requests (site and API on the same domain) are always allowed.
+      const isSameOrigin = !!origin && origin === `${req.protocol}://${req.get('host')}`;
+      const isAllowed = !origin || isSameOrigin || allowedOrigins.includes(origin);
+
+      // Unknown origins are refused quietly (no CORS headers, no error stack trace).
+      callback(null, {
+        origin: isAllowed,
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+      });
+    })
+  );
 
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
@@ -142,8 +151,8 @@ async function startServer() {
   }
 
   const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Proprint server running on http://0.0.0.0:${PORT}`);
-    console.log(`📊 Health Endpoint: http://0.0.0.0:${PORT}/api/health`);
+    console.log(`🚀 Proprint server running on http://localhost:${PORT}`);
+    console.log(`📊 Health Endpoint: http://localhost:${PORT}/api/health`);
   });
 
   const shutdown = async () => {

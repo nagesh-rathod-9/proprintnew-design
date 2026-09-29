@@ -33,6 +33,7 @@ import { Product } from '../types';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { WhatsAppModal } from '../components/WhatsAppModal';
 import { ReviewCard } from '../components/ReviewCard';
+import { NotFoundPage } from './NotFoundPage';
 
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -40,13 +41,31 @@ export const ProductDetailPage: React.FC = () => {
   const { products, addToCart, toggleWishlist, isWishlisted, showToast, isMarathi, currentUser } = useApp();
 
   const [backendProduct, setBackendProduct] = useState<Product | null>(null);
+  const [productLoadState, setProductLoadState] = useState<'loading' | 'ready' | 'not-found' | 'error'>('loading');
 
   // Fetch real product details from backend
   useEffect(() => {
-    if (!id) return;
+    let isCurrentRequest = true;
+    setBackendProduct(null);
+    setProductLoadState('loading');
+
+    if (!id) {
+      setProductLoadState('not-found');
+      return () => {
+        isCurrentRequest = false;
+      };
+    }
+
     apiFetch(`/api/products/${id}`)
-      .then((res) => res.json())
-      .then((data) => {
+      .then(async (res) => {
+        if (res.status === 404) {
+          setProductLoadState('not-found');
+          return;
+        }
+        if (!res.ok) throw new Error(`Product request failed (${res.status})`);
+
+        const data = await res.json();
+        if (!isCurrentRequest) return;
         if (data.success && data.product) {
           setBackendProduct({
             ...data.product,
@@ -55,18 +74,31 @@ export const ProductDetailPage: React.FC = () => {
               ? data.product.galleryImages.map((image: string) => getFullImageUrl(image))
               : []
           });
+          setProductLoadState('ready');
+        } else {
+          setProductLoadState('not-found');
         }
       })
-      .catch((err) => console.warn('Product live fetch error:', err));
+      .catch((err) => {
+        if (!isCurrentRequest) return;
+        console.warn('Product live fetch error:', err);
+        setProductLoadState('error');
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
   }, [id]);
 
   const matchedProduct = products.find((p) => p.id === id);
-  const product = useMemo(() => {
-    if (backendProduct && matchedProduct && backendProduct.id === matchedProduct.id) {
-      return { ...matchedProduct, ...backendProduct };
+  const currentBackendProduct = backendProduct?.id === id ? backendProduct : null;
+  const resolvedProduct = useMemo(() => {
+    if (currentBackendProduct && matchedProduct && currentBackendProduct.id === matchedProduct.id) {
+      return { ...matchedProduct, ...currentBackendProduct };
     }
-    return backendProduct || matchedProduct;
-  }, [backendProduct, matchedProduct, products]);
+    return currentBackendProduct || matchedProduct;
+  }, [currentBackendProduct, matchedProduct, products]);
+  const product = resolvedProduct || ({} as Product);
 
   // Real gallery images from backend - primary cover image is ALWAYS first, followed by other admin photos
   const gallery = useMemo(() => {
@@ -346,6 +378,7 @@ Hello Proprint Team, please confirm this order, share the digital proof, and pro
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    if (!resolvedProduct) return;
     if (product.finishes && product.finishes.length > 0) {
       setSelectedFinish(product.finishes[0]);
     }
@@ -355,7 +388,29 @@ Hello Proprint Team, please confirm this order, share the digital proof, and pro
     if (product.defaultQuantity) {
       setSelectedQuantity(product.defaultQuantity);
     }
-  }, [id, product]);
+  }, [id, product, resolvedProduct]);
+
+  if (!resolvedProduct && productLoadState === 'loading') {
+    return (
+      <main className="flex min-h-[65vh] items-center justify-center bg-slate-50 px-5" role="status">
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-slate-700 shadow-sm">
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-rose-600 border-t-transparent" />
+          Loading product...
+        </div>
+      </main>
+    );
+  }
+
+  if (!resolvedProduct) {
+    return (
+      <NotFoundPage
+        title={productLoadState === 'error' ? 'Product unavailable' : 'Product not found'}
+        description={productLoadState === 'error'
+          ? 'We could not load this product right now. Please return home and try again.'
+          : 'This product link is invalid or the product is no longer available.'}
+      />
+    );
+  }
 
   return (
     <div className="bg-[#FAFBFD] min-h-screen text-slate-900 font-sans pb-28 sm:pb-20">

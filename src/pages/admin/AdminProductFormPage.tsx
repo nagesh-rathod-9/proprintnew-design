@@ -37,7 +37,7 @@ export const AdminProductFormPage: React.FC = () => {
   const [name, setName] = useState(existingProduct?.name || '');
   const [nameMr, setNameMr] = useState(existingProduct?.nameMr || '');
   const [tagline, setTagline] = useState(existingProduct?.tagline || '');
-  const [badge, setBadge] = useState(existingProduct?.badge || 'PRO PRINT BESTSELLER');
+  const [badge, setBadge] = useState(existingProduct?.badge || '');
   const [unit, setUnit] = useState(existingProduct?.unit || 'pcs');
 
   const [categoryId, setCategoryId] = useState<CategoryId>(() => {
@@ -46,10 +46,10 @@ export const AdminProductFormPage: React.FC = () => {
   });
 
   const [price, setPrice] = useState<string>(
-    existingProduct ? existingProduct.basePrice.toString() : '299'
+    existingProduct ? existingProduct.basePrice.toString() : ''
   );
   const [originalPrice, setOriginalPrice] = useState<string>(
-    existingProduct?.originalPrice ? existingProduct.originalPrice.toString() : '399'
+    existingProduct?.originalPrice ? existingProduct.originalPrice.toString() : ''
   );
   const [singlePrice, setSinglePrice] = useState<string>(
     existingProduct?.singlePrice !== undefined ? existingProduct.singlePrice.toString() : ''
@@ -67,29 +67,26 @@ export const AdminProductFormPage: React.FC = () => {
     existingProduct?.bulkPrice1000 !== undefined ? existingProduct.bulkPrice1000.toString() : ''
   );
   const [isBestSeller, setIsBestSeller] = useState<boolean>(
-    existingProduct?.isBestSeller ?? true
+    existingProduct?.isBestSeller ?? false
   );
   const [minQty, setMinQty] = useState<string>(
-    existingProduct ? existingProduct.minQuantity?.toString() || '10' : '10'
+    existingProduct ? existingProduct.minQuantity?.toString() || '' : ''
   );
   const [defaultQty, setDefaultQty] = useState<string>(
-    existingProduct ? existingProduct.defaultQuantity?.toString() || '25' : '25'
+    existingProduct ? existingProduct.defaultQuantity?.toString() || '' : ''
   );
   const [quantityOptionsStr, setQuantityOptionsStr] = useState<string>(
     existingProduct?.quantityOptions && existingProduct.quantityOptions.length > 0
       ? existingProduct.quantityOptions.join(', ')
-      : '10, 25, 50, 100, 200, 250, 500, 1000'
+        : ''
   );
 
   const [turnaround, setTurnaround] = useState<string>(
-    existingProduct?.specifications?.['Turnaround'] || '24-48 Hours'
+    existingProduct?.specifications?.['Turnaround'] || ''
   );
-  const [description, setDescription] = useState(
-    existingProduct?.description ||
-      'Heidelberg 4-color offset press fidelity with European high-density board.'
-  );
+  const [description, setDescription] = useState(existingProduct?.description || '');
   const [tags, setTags] = useState<string[]>(
-    existingProduct?.tags || ['Offset', 'Premium', 'Fast Dispatch']
+    existingProduct?.tags || []
   );
   const [newTagInput, setNewTagInput] = useState('');
 
@@ -97,11 +94,7 @@ export const AdminProductFormPage: React.FC = () => {
   const [features, setFeatures] = useState<string[]>(
     existingProduct?.features && existingProduct.features.length > 0
       ? existingProduct.features
-      : [
-          'Heidelberg 4-Color Precision Offset Printing',
-          'Premium substrate with scratch-resistant coating',
-          'Fast turnaround with express safe dispatch'
-        ]
+      : []
   );
   const [newFeatureInput, setNewFeatureInput] = useState('');
 
@@ -109,46 +102,17 @@ export const AdminProductFormPage: React.FC = () => {
   const [finishes, setFinishes] = useState<PaperFinish[]>(
     existingProduct?.finishes && existingProduct.finishes.length > 0
       ? existingProduct.finishes
-      : [
-          {
-            id: 'finish-1',
-            name: 'Gloss Waterproof Vinyl',
-            gsm: '120 Micron',
-            description: 'Weatherproof, UV-resistant permanent adhesive gloss vinyl',
-            priceMultiplier: 1.0
-          },
-          {
-            id: 'finish-2',
-            name: 'Silk Matte Vinyl',
-            gsm: '120 Micron',
-            description: 'Luxury non-glare smooth finish',
-            priceMultiplier: 1.1
-          }
-        ]
+      : []
   );
 
   // Dimensions & Sizes Editor
   const [sizes, setSizes] = useState<ProductSize[]>(
     existingProduct?.sizes && existingProduct.sizes.length > 0
       ? existingProduct.sizes
-      : [
-          {
-            id: 'size-1',
-            name: '12" x 18" Full Sheet (305 x 457 mm)',
-            dimension: '12x18 inch Sheet',
-            priceMultiplier: 1.0
-          },
-          {
-            id: 'size-2',
-            name: '13" x 19" Super A3 Sheet',
-            dimension: '13x19 inch Sheet',
-            priceMultiplier: 1.2
-          }
-        ]
+      : []
   );
 
   // Uploaded Images State & URL Adder
-  const [imageUrlInput, setImageUrlInput] = useState('');
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<
     { name: string; size: string; progress: number; preview: string }[]
@@ -168,14 +132,7 @@ export const AdminProductFormPage: React.FC = () => {
         }));
       }
     }
-    return [
-      {
-        name: 'Cover_Photo.png',
-        size: 'Primary Mockup',
-        progress: 100,
-        preview: 'https://i.pinimg.com/1200x/72/c7/ec/72c7ec157835f3350324004879afa7b2.jpg'
-      }
-    ];
+    return [];
   });
 
   useEffect(() => {
@@ -184,7 +141,7 @@ export const AdminProductFormPage: React.FC = () => {
       setNameMr(existingProduct.nameMr || '');
       setCategoryId(existingProduct.categoryId);
       setTagline(existingProduct.tagline || '');
-      setBadge(existingProduct.badge || 'PRO PRINT BESTSELLER');
+      setBadge(existingProduct.badge || '');
       setUnit(existingProduct.unit || 'pcs');
       setPrice(existingProduct.basePrice.toString());
       setOriginalPrice(existingProduct.originalPrice ? existingProduct.originalPrice.toString() : Math.round(existingProduct.basePrice * 1.3).toString());
@@ -193,16 +150,16 @@ export const AdminProductFormPage: React.FC = () => {
       setBulkPrice200(existingProduct.bulkPrice200 !== undefined ? existingProduct.bulkPrice200.toString() : '');
       setBulkPrice500(existingProduct.bulkPrice500 !== undefined ? existingProduct.bulkPrice500.toString() : '');
       setBulkPrice1000(existingProduct.bulkPrice1000 !== undefined ? existingProduct.bulkPrice1000.toString() : '');
-      setIsBestSeller(existingProduct.isBestSeller ?? true);
-      setMinQty(existingProduct.minQuantity ? existingProduct.minQuantity.toString() : '10');
-      setDefaultQty(existingProduct.defaultQuantity ? existingProduct.defaultQuantity.toString() : '25');
+      setIsBestSeller(existingProduct.isBestSeller ?? false);
+      setMinQty(existingProduct.minQuantity?.toString() || '');
+      setDefaultQty(existingProduct.defaultQuantity?.toString() || '');
       setQuantityOptionsStr(
         existingProduct.quantityOptions && existingProduct.quantityOptions.length > 0
           ? existingProduct.quantityOptions.join(', ')
-          : '10, 25, 50, 100, 200, 250, 500, 1000'
+          : ''
       );
       setDescription(existingProduct.description || '');
-      setTags(existingProduct.tags || ['Offset', 'Premium']);
+      setTags(existingProduct.tags || []);
       if (existingProduct.specifications?.['Turnaround']) {
         setTurnaround(existingProduct.specifications['Turnaround']);
       }
@@ -283,26 +240,6 @@ export const AdminProductFormPage: React.FC = () => {
   };
 
   // Handle adding image via URL
-  const handleAddImageUrl = () => {
-    const trimmed = imageUrlInput.trim();
-    if (!trimmed) return;
-    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://') && !trimmed.startsWith('/')) {
-      showToast('Please enter a valid URL starting with http://, https://, or /', 'error');
-      return;
-    }
-    setUploadedImages((prev) => [
-      ...prev,
-      {
-        name: `Photo_Link_${prev.length + 1}.png`,
-        size: 'Remote URL',
-        progress: 100,
-        preview: trimmed
-      }
-    ]);
-    setImageUrlInput('');
-    showToast('Photo added to gallery!', 'success');
-  };
-
   // Reorder / set image as cover
   const handleSetCover = (index: number) => {
     if (index === 0) return;
@@ -327,71 +264,7 @@ export const AdminProductFormPage: React.FC = () => {
   };
 
   const handleRemoveImage = (index: number) => {
-    if (uploadedImages.length <= 1) {
-      showToast('Product must have at least one photo.', 'info');
-      return;
-    }
     setUploadedImages(uploadedImages.filter((_, i) => i !== index));
-  };
-
-  // Quick preset photos
-  const handleLoadPresetImages = (type: 'stickers' | 'cards' | 'boxes' | 'files') => {
-    if (type === 'stickers') {
-      setUploadedImages([
-        {
-          name: 'Sticker_Sheet_DieCut_12x18.png',
-          size: 'High-Res',
-          progress: 100,
-          preview: 'https://i.pinimg.com/1200x/72/c7/ec/72c7ec157835f3350324004879afa7b2.jpg'
-        },
-        {
-          name: 'Sticker_Showcase_Sample.png',
-          size: 'Real Photo',
-          progress: 100,
-          preview: 'https://images.unsplash.com/photo-1572375992501-4b0892d50c69?auto=format&fit=crop&w=900&q=80'
-        },
-        {
-          name: 'Sticker_Peel_Quality.png',
-          size: 'Close-Up',
-          progress: 100,
-          preview: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=900&q=80'
-        }
-      ]);
-    } else if (type === 'cards') {
-      setUploadedImages([
-        {
-          name: 'Luxury_Card_Mockup.png',
-          size: 'High-Res',
-          progress: 100,
-          preview: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80'
-        },
-        {
-          name: 'Embossed_Gold_Foil.png',
-          size: 'Detail Shot',
-          progress: 100,
-          preview: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80'
-        }
-      ]);
-    } else if (type === 'boxes') {
-      setUploadedImages([
-        {
-          name: 'Rigid_Packaging_Box.png',
-          size: 'High-Res',
-          progress: 100,
-          preview: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=600&auto=format&fit=crop&q=80'
-        }
-      ]);
-    } else {
-      setUploadedImages([
-        {
-          name: 'Project_Office_File.png',
-          size: 'High-Res',
-          progress: 100,
-          preview: 'https://i.pinimg.com/736x/55/d7/5b/55d75bcfad0da6b4df44d19c9fe953b8.jpg'
-        }
-      ]);
-    }
-    showToast(`Loaded sample photos for ${type}`, 'info');
   };
 
   // Tags & Features handlers
@@ -421,9 +294,9 @@ export const AdminProductFormPage: React.FC = () => {
   const handleAddFinish = () => {
     const newFinish: PaperFinish = {
       id: `finish-${Date.now()}`,
-      name: 'New Custom Paper / Finish',
-      gsm: '300 GSM',
-      description: 'Ultra-smooth European imported board',
+      name: '',
+      gsm: '',
+      description: '',
       priceMultiplier: 1.0
     };
     setFinishes([...finishes, newFinish]);
@@ -447,8 +320,8 @@ export const AdminProductFormPage: React.FC = () => {
   const handleAddSize = () => {
     const newSize: ProductSize = {
       id: `size-${Date.now()}`,
-      name: 'Custom Dimension',
-      dimension: 'Custom mm / inches',
+      name: '',
+      dimension: '',
       priceMultiplier: 1.0
     };
     setSizes([...sizes, newSize]);
@@ -514,7 +387,7 @@ export const AdminProductFormPage: React.FC = () => {
     const bulkPrice200Num = bulkPrice200.trim() ? parseFloat(bulkPrice200) : undefined;
     const bulkPrice500Num = bulkPrice500.trim() ? parseFloat(bulkPrice500) : undefined;
     const bulkPrice1000Num = bulkPrice1000.trim() ? parseFloat(bulkPrice1000) : undefined;
-    const originalPriceNum = originalPrice.trim() ? parseFloat(originalPrice) : Math.round(basePriceNum * 1.3);
+    const originalPriceNum = originalPrice.trim() ? parseFloat(originalPrice) : undefined;
 
     const productPayload: Partial<Product> = {
       name: name.trim(),
@@ -534,7 +407,7 @@ export const AdminProductFormPage: React.FC = () => {
       isPopular: true,
       minQuantity: minQtyNum,
       defaultQuantity: defaultQtyNum,
-      quantityOptions: parsedQtyOptions.length > 0 ? parsedQtyOptions : [10, 25, 50, 100, 200, 250, 500, 1000],
+      quantityOptions: parsedQtyOptions,
       description: description.trim(),
       tags,
       image: mainImage,
@@ -545,7 +418,7 @@ export const AdminProductFormPage: React.FC = () => {
       specifications: {
         ...(existingProduct?.specifications || {}),
         'Turnaround': turnaround,
-        'Stock / Subcategory': finishes[0]?.name || 'Commercial Press Stock'
+        'Stock / Subcategory': finishes[0]?.name || ''
       }
     };
 
@@ -622,12 +495,12 @@ export const AdminProductFormPage: React.FC = () => {
       </div>
 
       {/* Main Form Container */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="grid grid-cols-1 gap-8 items-start">
         
         {/* ========================================================= */}
         {/* LEFT COLUMN: REAL PRODUCT PHOTOS & GALLERY (lg:col-span-5) */}
         {/* ========================================================= */}
-        <div className="lg:col-span-5 space-y-5">
+        <div className="space-y-5">
           
           <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
@@ -643,39 +516,6 @@ export const AdminProductFormPage: React.FC = () => {
               <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-[11px]">
                 {uploadedImages.length} Photo{uploadedImages.length !== 1 ? 's' : ''}
               </span>
-            </div>
-
-            {/* Quick Sample Photos */}
-            <div className="flex flex-wrap items-center gap-1.5 p-2 bg-slate-50 rounded-xl border border-slate-100 text-[11px]">
-              <span className="text-slate-400 font-semibold px-1">Presets:</span>
-              <button
-                type="button"
-                onClick={() => handleLoadPresetImages('stickers')}
-                className="px-2 py-0.5 bg-white hover:bg-rose-50 text-[#FF0038] border border-rose-200 rounded-md font-bold transition-colors cursor-pointer"
-              >
-                + Sticker Mockups
-              </button>
-              <button
-                type="button"
-                onClick={() => handleLoadPresetImages('cards')}
-                className="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-md font-bold transition-colors cursor-pointer"
-              >
-                + Card Mockups
-              </button>
-              <button
-                type="button"
-                onClick={() => handleLoadPresetImages('boxes')}
-                className="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-md font-bold transition-colors cursor-pointer"
-              >
-                + Box Mockups
-              </button>
-              <button
-                type="button"
-                onClick={() => handleLoadPresetImages('files')}
-                className="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-md font-bold transition-colors cursor-pointer"
-              >
-                + File Mockups
-              </button>
             </div>
 
             {/* File Upload Zone */}
@@ -703,35 +543,6 @@ export const AdminProductFormPage: React.FC = () => {
               </div>
               <p className="text-[10px] text-slate-400">Supports PNG, JPG, WEBP (Multiple files allowed)</p>
             </label>
-
-            {/* Direct Image URL Input */}
-            <div className="space-y-1.5 pt-1">
-              <label className="text-[11px] font-bold text-slate-600 block">
-                Or Paste Image Link / CDN URL:
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/... or /uploads/..."
-                  value={imageUrlInput}
-                  onChange={(e) => setImageUrlInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddImageUrl();
-                    }
-                  }}
-                  className="flex-1 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#FF0038]"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddImageUrl}
-                  className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer"
-                >
-                  + Add URL
-                </button>
-              </div>
-            </div>
 
             {/* Uploaded Images List with Cover Badge and Action Controls */}
             <div className="space-y-2.5 pt-2">
@@ -835,7 +646,7 @@ export const AdminProductFormPage: React.FC = () => {
         {/* ========================================================= */}
         {/* RIGHT COLUMN: PRODUCT SPECIFICATIONS & PRICING (7 cols)    */}
         {/* ========================================================= */}
-        <div className="lg:col-span-7 space-y-5">
+        <div className="space-y-5">
           
           {/* Sub-Navigation Tabs */}
           <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-2xl text-xs font-bold">
@@ -908,20 +719,6 @@ export const AdminProductFormPage: React.FC = () => {
                   />
                 </div>
 
-                {/* Marathi Name Translation (Optional) */}
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-700 block">
-                    Product Name (Marathi Translation)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="उदा. १२x१८ सानुकूल आकाराचे स्टिकर शीट (₹७९/शीट)"
-                    value={nameMr}
-                    onChange={(e) => setNameMr(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 focus:border-[#FF0038] text-xs text-slate-900 focus:outline-none"
-                  />
-                </div>
-
                 {/* Tagline / Subtitle */}
                 <div className="space-y-1">
                   <label className="font-bold text-slate-700 block">
@@ -950,7 +747,7 @@ export const AdminProductFormPage: React.FC = () => {
                     >
                       {categories.map((c) => (
                         <option key={c.id} value={c.id}>
-                          {c.name} {c.nameMr ? `(${c.nameMr})` : ''}
+                          {c.name}
                         </option>
                       ))}
                     </select>

@@ -26,10 +26,12 @@ import { collection, doc, setDoc, getDocs, deleteDoc } from 'firebase/firestore'
 const ORACLE_SERVER_ORIGIN = 'http://140.238.167.184:3000';
 
 const LOCAL_SERVER_ORIGIN = String(
-  import.meta.env.VITE_API_ORIGIN || ORACLE_SERVER_ORIGIN
+  import.meta.env.VITE_API_ORIGIN ||
+    (import.meta.env.DEV ? window.location.origin : ORACLE_SERVER_ORIGIN)
 ).replace(/\/+$/, '');
 
 const API_BASE_URL = `${LOCAL_SERVER_ORIGIN}/api`;
+const HERO_SLIDES_CACHE_KEY = `proprint_cache_heroSlides_${LOCAL_SERVER_ORIGIN}`;
 
 /**
  * Convert any known old/local upload URL into the current relative
@@ -123,9 +125,7 @@ export const apiFetch = (
 ): Promise<Response> => {
   let url = typeof input === 'string' ? input : input.toString();
 
-  // Always route relative API calls to the configured Oracle/backend
-  // origin. This is important when the frontend is hosted on Vercel
-  // and the API is hosted separately on Oracle Cloud.
+  // Route relative API calls to the configured backend origin.
   if (url.startsWith('/api')) {
     const apiPath = url.slice('/api'.length);
     url = `${API_BASE_URL}${apiPath}`;
@@ -579,7 +579,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       const cachedProducts = readLocalCache<Product[]>('proprint_cache_products', []);
       const cachedCategories = readLocalCache<Category[]>('proprint_cache_categories', []);
-      const cachedHeroSlides = readLocalCache<HeroSlide[]>('proprint_cache_heroSlides', []);
+      const cachedHeroSlides = readLocalCache<HeroSlide[]>(HERO_SLIDES_CACHE_KEY, []);
       const cachedServices = readLocalCache<ServiceItem[]>('proprint_cache_services', []);
       const cachedPortfolio = readLocalCache<PortfolioItem[]>('proprint_cache_portfolio', []);
       const cachedOrders = readLocalCache<Order[]>('proprint_cache_orders', []);
@@ -678,7 +678,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (sData.success && Array.isArray(sData.slides)) {
             const transformedSlides = sData.slides.map((s: HeroSlide) => transformImageUrls(s));
             setHeroSlides(transformedSlides);
-            writeLocalCache('proprint_cache_heroSlides', transformedSlides);
+            writeLocalCache(HERO_SLIDES_CACHE_KEY, transformedSlides);
           }
         }),
 
@@ -784,7 +784,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const displayImage = imagePath
       ? getFullImageUrl(imagePath)
-      : 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80';
+      : '';
 
     const galleryPaths = Array.isArray(prodData.galleryImages)
       ? prodData.galleryImages
@@ -1056,7 +1056,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const newCat: Category = {
       id: newId,
       name: catData.name || 'New Category',
-      nameMr: catData.nameMr || catData.name || 'नवीन वर्गवारी',
+      nameMr: catData.nameMr || catData.name || '',
       shortName: catData.shortName || catData.name || 'Category',
       iconName: catData.iconName || 'Package',
       image: displayImage,

@@ -43,12 +43,16 @@ export const AdminCategoriesPage: React.FC = () => {
               className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between space-y-4 group hover:shadow-lg transition-all"
             >
               <div className="space-y-3">
-                <div className="h-32 rounded-2xl overflow-hidden bg-slate-100 relative">
-                  <img
-                    src={cat.image}
-                    alt={cat.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
+                <div className="h-32 rounded-2xl overflow-hidden bg-slate-100 relative flex items-center justify-center">
+                  {cat.image ? (
+                    <img
+                      src={cat.image}
+                      alt={cat.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <FolderTree className="h-8 w-8 text-slate-400" aria-hidden="true" />
+                  )}
                   <div className="absolute top-3 right-3 px-2.5 py-0.5 bg-slate-950/80 backdrop-blur-md rounded-full text-white text-[10px] font-bold">
                     {productCount} Products
                   </div>

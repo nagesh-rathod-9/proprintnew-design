@@ -39,7 +39,7 @@ import { AdminProductFormPage } from './pages/admin/AdminProductFormPage';
 import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { AdminUserFormPage } from './pages/admin/AdminUserFormPage';
 import { AdminCategoriesPage } from './pages/admin/AdminCategoriesPage';
-import { AdminCategoryFormPage } from './pages/admin/AdminCategoryFormPage';
+import { AdminCategoryFormPage } from './pages/admin/AdminCategoryEditorPage';
 import { AdminServicesPage } from './pages/admin/AdminServicesPage';
 import { AdminServiceFormPage } from './pages/admin/AdminServiceFormPage';
 import { AdminPaymentsPage } from './pages/admin/AdminPaymentsPage';
@@ -51,6 +51,7 @@ import { AdminDesignWorksPage } from './pages/admin/AdminDesignWorksPage';
 import { AdminDesignWorkFormPage } from './pages/admin/AdminDesignWorkFormPage';
 import { AdminQuotesPage } from './pages/admin/AdminQuotesPage';
 import { Product } from './types';
+import { NotFoundPage } from './pages/NotFoundPage';
 
 // ========== PULL-TO-REFRESH COMPONENT ==========
 const PullToRefresh: React.FC<{ children: React.ReactNode; onRefresh: () => Promise<void> }> = ({
@@ -242,6 +243,7 @@ const MainAppContent: React.FC = () => {
             <Route path="payments" element={<AdminPaymentsPage />} />
             <Route path="reviews" element={<AdminReviewsPage />} />
             <Route path="settings" element={<AdminSettingsPage />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
 
           {/* Customer Facing Pages */}
@@ -289,7 +291,7 @@ const MainAppContent: React.FC = () => {
           <Route path="/track-order" element={<TrackOrderPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/account" element={<ProfilePage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
 
