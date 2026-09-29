@@ -34,7 +34,7 @@ export const AdminDesignWorkFormPage: React.FC = () => {
   const [badge, setBadge] = useState(existingItem?.badge || 'Featured Work');
   const [description, setDescription] = useState(existingItem?.description || '');
   const [descriptionMr, setDescriptionMr] = useState(existingItem?.descriptionMr || '');
-  const [aspectRatio, setAspectRatio] = useState<'square' | 'wide' | 'tall'>(existingItem?.aspectRatio || 'square');
+  const [aspectRatio, setAspectRatio] = useState<'square' | 'landscape' | 'portrait'>(existingItem?.aspectRatio || 'square');
   const [imageUrl, setImageUrl] = useState(
     existingItem?.image || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&auto=format&fit=crop&q=80'
   );

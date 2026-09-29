@@ -1,13 +1,12 @@
 import { Router, Request, Response } from 'express';
-import { getDb, saveDb, queryAll, queryOne, runSql } from '../db.js';
+import { execute, queryAll } from '../db.js';
 
 export const paymentsRouter = Router();
 
 // GET /api/payments - Get all payments
 paymentsRouter.get('/', async (_req: Request, res: Response) => {
   try {
-    const db = await getDb();
-    const rows = queryAll(db, `SELECT * FROM payments ORDER BY created_at DESC`);
+    const rows = await queryAll(`SELECT * FROM payments ORDER BY created_at DESC`);
     const payments = rows.map((row: any) => ({
       id: row.id,
       orderId: row.order_id,
@@ -30,12 +29,10 @@ paymentsRouter.get('/', async (_req: Request, res: Response) => {
 // POST /api/payments - Record new payment
 paymentsRouter.post('/', async (req: Request, res: Response) => {
   try {
-    const db = await getDb();
     const p = req.body;
     const id = p.id || `PAY-${Date.now()}`;
 
-    runSql(
-      db,
+    await execute(
       `INSERT INTO payments (id, order_id, order_number, customer_name, amount, method, status, transaction_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -49,7 +46,6 @@ paymentsRouter.post('/', async (req: Request, res: Response) => {
         p.transactionId || `TXN_${Date.now()}`
       ]
     );
-    saveDb();
 
     res.status(201).json({ success: true, payment: { ...p, id } });
   } catch (err: any) {
@@ -63,10 +59,7 @@ paymentsRouter.patch('/:id/status', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-    const db = await getDb();
-
-    runSql(db, `UPDATE payments SET status = ? WHERE id = ?`, [status, id]);
-    saveDb();
+    await execute(`UPDATE payments SET status = ? WHERE id = ?`, [status, id]);
 
     res.json({ success: true, message: `Payment #${id} marked as ${status}` });
   } catch (err: any) {

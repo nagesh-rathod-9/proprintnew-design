@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getDb, saveDb, queryAll, queryOne, runSql } from '../db.js';
+import { execute, queryAll, queryOne } from '../db.js';
 import { removeUploadIfUnused } from '../utils/uploadCleanup.js';
 
 export const categoriesRouter = Router();
@@ -7,14 +7,11 @@ export const categoriesRouter = Router();
 // GET /api/categories - Get all categories with real-time product counts
 categoriesRouter.get('/', async (_req: Request, res: Response) => {
   try {
-    const db = await getDb();
-
     // Query categories
-    const categoriesRows = queryAll(db, `SELECT * FROM categories ORDER BY featured DESC, name ASC`);
+    const categoriesRows = await queryAll(`SELECT * FROM categories ORDER BY featured DESC, name ASC`);
 
     // Fetch product counts grouped by category for high performance O(1) lookups
-    const countRows = queryAll<{ category_id: string; cnt: number }>(
-      db,
+    const countRows = await queryAll<{ category_id: string; cnt: number }>(
       `SELECT category_id, COUNT(*) as cnt FROM products GROUP BY category_id`
     );
 
@@ -54,7 +51,6 @@ categoriesRouter.get('/', async (_req: Request, res: Response) => {
 // POST /api/categories - Create category
 categoriesRouter.post('/', async (req: Request, res: Response) => {
   try {
-    const db = await getDb();
     const c = req.body;
     if (!c.name) {
       return res.status(400).json({ success: false, error: 'Category name is required' });
@@ -62,8 +58,7 @@ categoriesRouter.post('/', async (req: Request, res: Response) => {
 
     const id = c.id || c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-    runSql(
-      db,
+    await execute(
       `INSERT INTO categories (id, name, name_mr, short_name, subtitle, icon_name, image, item_count, featured, description)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -79,7 +74,6 @@ categoriesRouter.post('/', async (req: Request, res: Response) => {
         c.description || ''
       ]
     );
-    saveDb();
 
     res.status(201).json({
       success: true,
@@ -96,12 +90,10 @@ categoriesRouter.post('/', async (req: Request, res: Response) => {
 categoriesRouter.put('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const db = await getDb();
     const c = req.body;
-    const existing = queryOne<{ image: string }>(db, `SELECT image FROM categories WHERE id = ?`, [id]);
+    const existing = await queryOne<{ image: string }>(`SELECT image FROM categories WHERE id = ?`, [id]);
 
-    runSql(
-      db,
+    await execute(
       `UPDATE categories 
        SET name = COALESCE(?, name),
            name_mr = COALESCE(?, name_mr),
@@ -124,10 +116,8 @@ categoriesRouter.put('/:id', async (req: Request, res: Response) => {
         id
       ]
     );
-    saveDb();
-
     if (existing && c.image && c.image !== existing.image) {
-      removeUploadIfUnused(db, existing.image);
+      await removeUploadIfUnused(existing.image);
     }
 
     res.json({ success: true, message: 'Category updated successfully' });
@@ -141,11 +131,9 @@ categoriesRouter.put('/:id', async (req: Request, res: Response) => {
 categoriesRouter.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const db = await getDb();
-    const existing = queryOne<{ image: string }>(db, `SELECT image FROM categories WHERE id = ?`, [id]);
-    runSql(db, `DELETE FROM categories WHERE id = ?`, [id]);
-    saveDb();
-    if (existing) removeUploadIfUnused(db, existing.image);
+    const existing = await queryOne<{ image: string }>(`SELECT image FROM categories WHERE id = ?`, [id]);
+    await execute(`DELETE FROM categories WHERE id = ?`, [id]);
+    if (existing) await removeUploadIfUnused(existing.image);
     res.json({ success: true, message: 'Category deleted successfully' });
   } catch (err: any) {
     console.error('Error deleting category:', err);

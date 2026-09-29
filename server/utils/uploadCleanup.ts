@@ -30,31 +30,35 @@ export const getStoredUploadPath = (image: unknown): string | null => {
   return path.dirname(uploadPath) === UPLOADS_DIR ? uploadPath : null;
 };
 
-const collectImageReferences = (db: any): string[] => {
+const collectImageReferences = async (): Promise<string[]> => {
   const references: string[] = [];
   const add = (value: unknown) => {
     if (typeof value === 'string') references.push(value);
   };
 
-  queryAll<{ image: string }>(db, 'SELECT image FROM hero_slides').forEach((row) => add(row.image));
-  queryAll<{ image: string }>(db, 'SELECT image FROM categories').forEach((row) => add(row.image));
-  queryAll<{ image: string; gallery_json: string }>(db, 'SELECT image, gallery_json FROM products').forEach((row) => {
+  const heroSlides = await queryAll<{ image: string }>('SELECT image FROM hero_slides');
+  heroSlides.forEach((row) => add(row.image));
+  const categories = await queryAll<{ image: string }>('SELECT image FROM categories');
+  categories.forEach((row) => add(row.image));
+  const products = await queryAll<{ image: string; gallery_json: string }>('SELECT image, gallery_json FROM products');
+  products.forEach((row) => {
     add(row.image);
     try {
       const gallery = JSON.parse(row.gallery_json || '[]');
       if (Array.isArray(gallery)) gallery.forEach(add);
     } catch (_error) {}
   });
-  queryAll<{ image: string }>(db, 'SELECT image FROM portfolio').forEach((row) => add(row.image));
+  const portfolio = await queryAll<{ image: string }>('SELECT image FROM portfolio');
+  portfolio.forEach((row) => add(row.image));
 
   return references;
 };
 
-export const removeUploadIfUnused = (db: any, image: unknown) => {
+export const removeUploadIfUnused = async (image: unknown) => {
   const uploadPath = getStoredUploadPath(image);
   if (!uploadPath) return;
 
-  const stillReferenced = collectImageReferences(db).some(
+  const stillReferenced = (await collectImageReferences()).some(
     (reference) => getStoredUploadPath(reference) === uploadPath
   );
   if (stillReferenced) return;
@@ -66,7 +70,9 @@ export const removeUploadIfUnused = (db: any, image: unknown) => {
   });
 };
 
-export const removeUploadsIfUnused = (db: any, images: unknown[]) => {
+export const removeUploadsIfUnused = async (images: unknown[]) => {
   const uniqueImages = Array.from(new Set(images.filter(Boolean)));
-  uniqueImages.forEach((image) => removeUploadIfUnused(db, image));
+  for (const image of uniqueImages) {
+    await removeUploadIfUnused(image);
+  }
 };

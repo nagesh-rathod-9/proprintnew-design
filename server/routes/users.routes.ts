@@ -1,10 +1,10 @@
 import { Router, Request, Response } from 'express';
-import { getDb, saveDb, queryAll, queryOne, runSql } from '../db.js';
+import { execute, queryAll, queryOne } from '../db.js';
 import { requireRole } from '../middleware/auth.js';
 
 export const usersRouter = Router();
 
-const mapUserRowWithStats = (row: any, db: any) => {
+const mapUserRowWithStats = async (row: any) => {
   let addresses = [];
   try {
     addresses = JSON.parse(row.addresses_json || '[]');
@@ -32,8 +32,7 @@ const mapUserRowWithStats = (row: any, db: any) => {
   }
 
   // Pre-calculate user order counts and total spent
-  const stats = queryOne<{ orderCount: number; totalSpent: number }>(
-    db,
+  const stats = await queryOne<{ orderCount: number; totalSpent: number }>(
     `SELECT COUNT(*) as orderCount, COALESCE(SUM(total), 0) as totalSpent 
      FROM orders 
      WHERE user_id = ? OR customer_email = ?`,
@@ -61,9 +60,8 @@ const mapUserRowWithStats = (row: any, db: any) => {
 // GET /api/users - Get all users
 usersRouter.get('/', requireRole('admin'), async (_req: Request, res: Response) => {
   try {
-    const db = await getDb();
-    const rows = queryAll(db, `SELECT * FROM users ORDER BY created_at DESC`);
-    const users = rows.map(r => mapUserRowWithStats(r, db));
+    const rows = await queryAll(`SELECT * FROM users ORDER BY created_at DESC`);
+    const users = await Promise.all(rows.map((r) => mapUserRowWithStats(r)));
     res.json({ success: true, users });
   } catch (err: any) {
     console.error('Error fetching users:', err);
@@ -78,12 +76,11 @@ usersRouter.get('/:id', async (req: Request, res: Response) => {
     if (req.auth?.role !== 'admin' && req.auth?.userId !== id) {
       return res.status(403).json({ success: false, error: 'You can only access your own profile' });
     }
-    const db = await getDb();
-    const row = queryOne(db, `SELECT * FROM users WHERE id = ? OR email = ? LIMIT 1`, [id, id]);
+    const row = await queryOne(`SELECT * FROM users WHERE id = ? OR email = ? LIMIT 1`, [id, id]);
     if (!row) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
-    res.json({ success: true, user: mapUserRowWithStats(row, db) });
+    res.json({ success: true, user: await mapUserRowWithStats(row) });
   } catch (err: any) {
     console.error('Error fetching user:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -94,7 +91,6 @@ usersRouter.get('/:id', async (req: Request, res: Response) => {
 usersRouter.put('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const db = await getDb();
     const {
       name,
       phone,
@@ -108,7 +104,7 @@ usersRouter.put('/:id', async (req: Request, res: Response) => {
       role
     } = req.body;
 
-    const existing = queryOne(db, `SELECT * FROM users WHERE id = ?`, [id]);
+    const existing = await queryOne(`SELECT * FROM users WHERE id = ?`, [id]);
     if (!existing) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
@@ -116,8 +112,7 @@ usersRouter.put('/:id', async (req: Request, res: Response) => {
     const updatedAddresses = addresses ? JSON.stringify(addresses) : existing.addresses_json;
     const passwordHash = password ? password : existing.password_hash;
 
-    runSql(
-      db,
+    await execute(
       `UPDATE users 
        SET name = COALESCE(?, name),
            phone = COALESCE(?, phone),
@@ -144,12 +139,11 @@ usersRouter.put('/:id', async (req: Request, res: Response) => {
         id
       ]
     );
-    saveDb();
 
-    const updated = queryOne(db, `SELECT * FROM users WHERE id = ?`, [id]);
+    const updated = await queryOne(`SELECT * FROM users WHERE id = ?`, [id]);
     res.json({
       success: true,
-      user: mapUserRowWithStats(updated, db),
+      user: updated ? await mapUserRowWithStats(updated) : null,
       message: 'Profile updated successfully'
     });
   } catch (err: any) {
@@ -162,9 +156,7 @@ usersRouter.put('/:id', async (req: Request, res: Response) => {
 usersRouter.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const db = await getDb();
-    runSql(db, `DELETE FROM users WHERE id = ?`, [id]);
-    saveDb();
+    await execute(`DELETE FROM users WHERE id = ?`, [id]);
     res.json({ success: true, message: 'User deleted successfully' });
   } catch (err: any) {
     console.error('Error deleting user:', err);

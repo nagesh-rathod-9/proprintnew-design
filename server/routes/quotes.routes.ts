@@ -1,13 +1,12 @@
 import { Router, Request, Response } from 'express';
-import { getDb, saveDb, queryAll, queryOne, runSql } from '../db.js';
+import { execute, queryAll } from '../db.js';
 
 export const quotesRouter = Router();
 
 // GET /api/quotes - Get all quotes
 quotesRouter.get('/', async (_req: Request, res: Response) => {
   try {
-    const db = await getDb();
-    const rows = queryAll(db, `SELECT * FROM quotes ORDER BY created_at DESC`);
+    const rows = await queryAll(`SELECT * FROM quotes ORDER BY created_at DESC`);
     const quotes = rows.map((row: any) => ({
       id: row.id,
       customerName: row.customer_name,
@@ -44,12 +43,10 @@ quotesRouter.get('/', async (_req: Request, res: Response) => {
 // POST /api/quotes - Create quote request
 quotesRouter.post('/', async (req: Request, res: Response) => {
   try {
-    const db = await getDb();
     const q = req.body;
     const id = q.id || `quote-${Date.now()}`;
 
-    runSql(
-      db,
+    await execute(
       `INSERT INTO quotes (id, customer_name, customer_email, customer_phone, company_name, product_category, quantity, paper_gsm, finish_type, size, special_instructions, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -67,7 +64,6 @@ quotesRouter.post('/', async (req: Request, res: Response) => {
         q.status || 'New'
       ]
     );
-    saveDb();
 
     res.status(201).json({
       success: true,
@@ -85,10 +81,8 @@ quotesRouter.patch('/:id/status', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-    const db = await getDb();
 
-    runSql(db, `UPDATE quotes SET status = ? WHERE id = ?`, [status, id]);
-    saveDb();
+    await execute(`UPDATE quotes SET status = ? WHERE id = ?`, [status, id]);
 
     res.json({ success: true, message: `Quote status updated to ${status}` });
   } catch (err: any) {
@@ -101,9 +95,7 @@ quotesRouter.patch('/:id/status', async (req: Request, res: Response) => {
 quotesRouter.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const db = await getDb();
-    runSql(db, `DELETE FROM quotes WHERE id = ?`, [id]);
-    saveDb();
+    await execute(`DELETE FROM quotes WHERE id = ?`, [id]);
 
     res.json({ success: true, message: 'Quote request removed' });
   } catch (err: any) {

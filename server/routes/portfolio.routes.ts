@@ -1,5 +1,5 @@
-import { Router, Request, Response } from 'express';
-import { getDb, saveDb, queryAll, queryOne, runSql } from '../db.js';
+﻿import { Router, Request, Response } from 'express';
+import { execute, queryAll, queryOne } from '../db.js';
 import { removeUploadIfUnused } from '../utils/uploadCleanup.js';
 
 export const portfolioRouter = Router();
@@ -34,11 +34,9 @@ const mapPortfolioRow = (row: any) => {
   };
 };
 
-// GET /api/portfolio - Get all portfolio items
 portfolioRouter.get('/', async (_req: Request, res: Response) => {
   try {
-    const db = await getDb();
-    const rows = queryAll(db, `SELECT * FROM portfolio ORDER BY created_at ASC`);
+    const rows = await queryAll(`SELECT * FROM portfolio ORDER BY created_at ASC`);
     const portfolio = rows.map(mapPortfolioRow);
     res.json({ success: true, portfolio });
   } catch (err: any) {
@@ -47,15 +45,12 @@ portfolioRouter.get('/', async (_req: Request, res: Response) => {
   }
 });
 
-// POST /api/portfolio - Create portfolio item
 portfolioRouter.post('/', async (req: Request, res: Response) => {
   try {
-    const db = await getDb();
     const item = req.body;
     const id = item.id || `work-${Date.now()}`;
 
-    runSql(
-      db,
+    await execute(
       `INSERT INTO portfolio (
         id, title, title_mr, category, category_label, category_label_mr,
         client, city, city_mr, image, aspect_ratio, description, description_mr,
@@ -82,29 +77,21 @@ portfolioRouter.post('/', async (req: Request, res: Response) => {
         item.badgeMr || ''
       ]
     );
-    saveDb();
 
-    res.status(201).json({
-      success: true,
-      item: { ...item, id },
-      message: 'Portfolio item added successfully'
-    });
+    res.status(201).json({ success: true, item: { ...item, id }, message: 'Portfolio item added successfully' });
   } catch (err: any) {
     console.error('Error creating portfolio item:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// PUT /api/portfolio/:id - Update portfolio item
 portfolioRouter.put('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const db = await getDb();
     const item = req.body;
-    const existing = queryOne<{ image: string }>(db, `SELECT image FROM portfolio WHERE id = ?`, [id]);
+    const existing = await queryOne<{ image: string }>(`SELECT image FROM portfolio WHERE id = ?`, [id]);
 
-    runSql(
-      db,
+    await execute(
       `UPDATE portfolio
        SET title = COALESCE(?, title),
            title_mr = COALESCE(?, title_mr),
@@ -145,10 +132,9 @@ portfolioRouter.put('/:id', async (req: Request, res: Response) => {
         id
       ]
     );
-    saveDb();
 
     if (existing && item.image && item.image !== existing.image) {
-      removeUploadIfUnused(db, existing.image);
+      await removeUploadIfUnused(existing.image);
     }
 
     res.json({ success: true, message: 'Portfolio item updated successfully' });
@@ -158,15 +144,12 @@ portfolioRouter.put('/:id', async (req: Request, res: Response) => {
   }
 });
 
-// DELETE /api/portfolio/:id - Delete portfolio item
 portfolioRouter.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const db = await getDb();
-    const existing = queryOne<{ image: string }>(db, `SELECT image FROM portfolio WHERE id = ?`, [id]);
-    runSql(db, `DELETE FROM portfolio WHERE id = ?`, [id]);
-    saveDb();
-    if (existing) removeUploadIfUnused(db, existing.image);
+    const existing = await queryOne<{ image: string }>(`SELECT image FROM portfolio WHERE id = ?`, [id]);
+    await execute(`DELETE FROM portfolio WHERE id = ?`, [id]);
+    if (existing) await removeUploadIfUnused(existing.image);
 
     res.json({ success: true, message: 'Portfolio item deleted successfully' });
   } catch (err: any) {

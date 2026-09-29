@@ -1,17 +1,15 @@
 import { Router, Request, Response } from 'express';
-import { getDb, queryOne } from '../db.js';
+import { queryOne } from '../db.js';
 
 export const healthRouter = Router();
 
 healthRouter.get('/', async (_req: Request, res: Response) => {
   try {
-    const db = await getDb();
     const memory = process.memoryUsage();
-
-    // Query record counts from primary tables for monitoring
-    const productsCount = queryOne<{ count: number }>(db, 'SELECT COUNT(*) as count FROM products')?.count || 0;
-    const ordersCount = queryOne<{ count: number }>(db, 'SELECT COUNT(*) as count FROM orders')?.count || 0;
-    const usersCount = queryOne<{ count: number }>(db, 'SELECT COUNT(*) as count FROM users')?.count || 0;
+    await queryOne('SELECT 1');
+    const productsCount = (await queryOne<{ count: number }>('SELECT COUNT(*) as count FROM products'))?.count || 0;
+    const ordersCount = (await queryOne<{ count: number }>('SELECT COUNT(*) as count FROM orders'))?.count || 0;
+    const usersCount = (await queryOne<{ count: number }>('SELECT COUNT(*) as count FROM users'))?.count || 0;
 
     res.json({
       status: 'ok',
@@ -25,7 +23,7 @@ healthRouter.get('/', async (_req: Request, res: Response) => {
         heapTotalMb: (memory.heapTotal / (1024 * 1024)).toFixed(2)
       },
       database: {
-        engine: 'SQLite (sql.js in-memory with atomic debounced persistence)',
+        engine: 'MySQL',
         metrics: {
           products: productsCount,
           orders: ordersCount,

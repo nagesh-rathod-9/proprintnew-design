@@ -254,7 +254,7 @@ export const AdminDesignWorksPage: React.FC = () => {
           confirmText="Yes, Delete Work"
           confirmColor="danger"
           onConfirm={handleConfirmDelete}
-          onClose={() => setItemToDelete(null)}
+          onCancel={() => setItemToDelete(null)}
         />
       )}
 

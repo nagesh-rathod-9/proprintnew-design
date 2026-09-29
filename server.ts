@@ -4,9 +4,12 @@ import path from 'path';
 import fs from 'fs';
 import compression from 'compression';
 import { createServer as createViteServer } from 'vite';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 // Database & Core
-import { getDb, flushDbBeforeExit } from './server/db.js';
+import { initializeDatabase, closeDb } from './server/db.js';
 
 // Middlewares
 import { securityHeaders } from './server/middleware/security.js';
@@ -29,36 +32,38 @@ import { paymentsRouter } from './server/routes/payments.routes.js';
 import { portfolioRouter } from './server/routes/portfolio.routes.js';
 import { cashfreeRouter } from './server/routes/cashfree.routes.js';
 import { uploadRouter } from './server/routes/upload.routes.js';
-import { requireAdminWrite, requireAuthenticatedWrite, requireAuth, requireRole } from './server/middleware/auth.js';
+import { requireAdminWrite, requireAuthenticatedWrite, requireAuth } from './server/middleware/auth.js';
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || 3000);
 
-  // Initialize SQLite database instance and schema on boot
-  console.log('📦 Initializing Proprint Database Engine...');
-  await getDb();
-  console.log('✅ SQLite Database initialized with schema, indexes, and seed records');
+  app.set('trust proxy', 1);
 
-  // Gzip compression for all outgoing JSON and static responses
+  console.log('📦 Initializing Proprint MySQL database engine...');
+  await initializeDatabase();
+  console.log('✅ MySQL database initialized and migrations applied.');
+
   app.use(compression());
-
-  // Security & logging middleware
   app.use(securityHeaders);
   app.use(requestLogger);
 
-  // Cross-Origin Resource Sharing
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173').split(',').map((value) => value.trim()).filter(Boolean);
   app.use(cors({
-    origin: true,
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`Origin ${origin} is not allowed by CORS.`));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
   }));
 
-  // Body parsers with generous limits for print design payloads
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+  app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-  // Static directory for uploaded files with 1-day caching and ETags
   const uploadsDir = path.join(process.cwd(), 'uploads');
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
@@ -90,7 +95,6 @@ async function startServer() {
     const contentType = mimeMap[ext] || 'application/octet-stream';
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=86400, must-revalidate');
-
     const isImage = ['.jpg', '.jpeg', '.png', '.webp', '.svg', '.gif', '.tif', '.tiff'].includes(ext);
     const disposition = isImage ? 'inline' : `attachment; filename="${fileName.replace(/"/g, '')}"`;
     res.setHeader('Content-Disposition', disposition);
@@ -102,10 +106,8 @@ async function startServer() {
     etag: true
   }));
 
-  // Apply cache-busting / no-store headers exclusively to dynamic /api routes
   app.use('/api', noCacheHeaders);
 
-  // Mount API Routers
   app.use('/api/health', healthRouter);
   app.use('/api/auth', authRouter);
   app.use('/api/users', requireAuth, usersRouter);
@@ -120,11 +122,8 @@ async function startServer() {
   app.use('/api/portfolio', requireAdminWrite, portfolioRouter);
   app.use('/api/cashfree', cashfreeRouter);
   app.use('/api/upload', requireAuthenticatedWrite, uploadRouter);
-
-  // Global Error Handler for API routes
   app.use('/api', errorHandler);
 
-  // SPA Serving: Vite middleware in development / static dist in production
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -143,25 +142,25 @@ async function startServer() {
   }
 
   const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Proprint Production Server running on http://0.0.0.0:${PORT}`);
+    console.log(`🚀 Proprint server running on http://0.0.0.0:${PORT}`);
     console.log(`📊 Health Endpoint: http://0.0.0.0:${PORT}/api/health`);
   });
 
-  // Graceful shutdown handling
-  const shutdown = () => {
-    console.log('🛑 Received shutdown signal. Closing server gracefully...');
-    server.close(() => {
-      flushDbBeforeExit();
-      console.log('✅ Server closed and database saved cleanly.');
-      process.exit(0);
+  const shutdown = async () => {
+    console.log('🛑 Closing server gracefully...');
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
     });
+    await closeDb();
+    console.log('✅ Server closed cleanly.');
+    process.exit(0);
   };
 
-  process.on('SIGTERM', shutdown);
-  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', () => { void shutdown(); });
+  process.on('SIGINT', () => { void shutdown(); });
 }
 
-startServer().catch(err => {
-  console.error('Fatal: Failed to start server:', err);
+startServer().catch((error) => {
+  console.error('Fatal: Failed to start server:', error);
   process.exit(1);
 });

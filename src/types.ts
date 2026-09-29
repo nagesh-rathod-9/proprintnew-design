@@ -127,6 +127,10 @@ export interface Product {
   quantityOptions: number[];
   sizes: ProductSize[];
   finishes: PaperFinish[];
+  paperTypes?: string[];
+  paperGsm?: string;
+  finish?: string;
+  size?: string;
   cornerOptions?: ('Standard Square' | 'Rounded (6mm)')[];
   features: string[];
   specifications?: { [key: string]: string };
@@ -166,6 +170,7 @@ export interface SelectedProductCustomization {
   corners?: 'Standard Square' | 'Rounded (6mm)';
   paperType?: string;
   paperFinish?: string;
+  lamination?: string;
   unit?: string;
   uploadedFileName?: string;
   uploadedFileNames?: string[];
@@ -220,6 +225,8 @@ export interface Order {
   city?: string;
   pincode?: string;
   items: CartItem[];
+  quantity?: number;
+  customerAddress?: string;
   subtotal?: number;
   shippingFee?: number;
   discount?: number;

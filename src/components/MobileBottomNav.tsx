@@ -9,6 +9,7 @@ interface MobileBottomNavProps {
   onOpenAccount?: () => void;
   onOpenWhatsApp?: () => void;
   onOpenTrackOrder?: () => void;
+  onOpenDesignStudio?: () => void;
   cartCount?: number;
 }
 

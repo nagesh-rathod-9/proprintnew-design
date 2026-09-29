@@ -49,8 +49,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     const auth = token ? readAuth(token) : null;
     if (!auth) return res.status(401).json({ success: false, error: 'Authentication required' });
 
-    const db = await getDb();
-    const user = queryOne<{ id: string; role: AuthRole; phone: string }>(db, `SELECT id, role, phone FROM users WHERE id = ?`, [auth.userId]);
+    const user = await queryOne<{ id: string; role: AuthRole; phone: string }>(`SELECT id, role, phone FROM users WHERE id = ?`, [auth.userId]);
     if (!user || user.role !== auth.role || (user.phone || '').replace(/\D/g, '').slice(-10) !== auth.phone) {
       return res.status(401).json({ success: false, error: 'Session is no longer valid' });
     }

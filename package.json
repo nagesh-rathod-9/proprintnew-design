@@ -9,7 +9,10 @@
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "migrate": "tsx server/migrate.ts",
+    "migrate-sqlite-to-mysql": "tsx scripts/migrate-sqlite-to-mysql.ts",
+    "create-admin": "tsx scripts/create-admin.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
@@ -32,11 +35,11 @@
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "multer": "^2.2.0",
+    "mysql2": "^3.4.1",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-redux": "^9.3.0",
     "react-router-dom": "^7.18.2",
-    "sql.js": "^1.14.2",
     "sqlite3": "^6.0.1",
     "vite": "^6.2.3"
   },

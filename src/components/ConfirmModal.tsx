@@ -8,6 +8,7 @@ interface ConfirmModalProps {
   confirmText?: string;
   cancelText?: string;
   variant?: 'danger' | 'warning' | 'info';
+  confirmColor?: string;
   onConfirm: () => void;
   onCancel: () => void;
   isLoading?: boolean;
@@ -20,13 +21,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   confirmText = 'Confirm',
   cancelText = 'Cancel',
   variant = 'danger',
+  confirmColor,
   onConfirm,
   onCancel,
   isLoading = false
 }) => {
   if (!isOpen) return null;
 
-  const isDanger = variant === 'danger';
+  const isDanger = confirmColor === 'danger' || variant === 'danger';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">

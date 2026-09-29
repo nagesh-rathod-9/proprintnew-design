@@ -1,5 +1,5 @@
-import { Router, Request, Response } from 'express';
-import { getDb, saveDb, queryAll, queryOne, runSql } from '../db.js';
+﻿import { Router, Request, Response } from 'express';
+import { execute, queryAll, queryOne } from '../db.js';
 import { removeUploadsIfUnused } from '../utils/uploadCleanup.js';
 
 export const productsRouter = Router();
@@ -21,7 +21,6 @@ export const mapProductRow = (row: any) => {
   try { quantityOptions = JSON.parse(row.quantity_options_json || '[]'); } catch (_e) { quantityOptions = []; }
   try { specifications = JSON.parse(row.specifications_json || '{}'); } catch (_e) { specifications = {}; }
 
-  // Filter out any legacy invalid abstract wallpaper and ensure primary image is first
   const validGallery = galleryImages.filter((img) => img && !img.includes('1618005182384-a83a8bd57fbe'));
   if (row.image) {
     const withoutCover = validGallery.filter((img) => img !== row.image);
@@ -68,10 +67,8 @@ export const mapProductRow = (row: any) => {
   };
 };
 
-// GET /api/products - Get products with optional search, category, and pagination
 productsRouter.get('/', async (req: Request, res: Response) => {
   try {
-    const db = await getDb();
     const { category, search, popular, bestSeller, limit, page } = req.query;
 
     let sql = `SELECT * FROM products WHERE 1=1`;
@@ -98,7 +95,6 @@ productsRouter.get('/', async (req: Request, res: Response) => {
 
     sql += ` ORDER BY is_best_seller DESC, is_popular DESC, created_at DESC`;
 
-    // Optional pagination
     if (limit) {
       const take = Math.max(1, parseInt(limit as string, 10) || 50);
       const skip = Math.max(0, ((parseInt(page as string, 10) || 1) - 1) * take);
@@ -106,7 +102,7 @@ productsRouter.get('/', async (req: Request, res: Response) => {
       params.push(take, skip);
     }
 
-    const rows = queryAll(db, sql, params);
+    const rows = await queryAll(sql, params);
     const products = rows.map(mapProductRow);
 
     res.json({ success: true, products, count: products.length });
@@ -116,12 +112,10 @@ productsRouter.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/products/:id - Get single product
 productsRouter.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const db = await getDb();
-    const row = queryOne(db, `SELECT * FROM products WHERE id = ? LIMIT 1`, [id]);
+    const row = await queryOne(`SELECT * FROM products WHERE id = ? LIMIT 1`, [id]);
 
     if (!row) {
       return res.status(404).json({ success: false, error: 'Product not found' });
@@ -134,10 +128,8 @@ productsRouter.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/products - Create new product
 productsRouter.post('/', async (req: Request, res: Response) => {
   try {
-    const db = await getDb();
     const p = req.body;
 
     if (!p.name || !p.categoryId) {
@@ -153,8 +145,7 @@ productsRouter.post('/', async (req: Request, res: Response) => {
     const quantityOptionsJson = JSON.stringify(p.quantityOptions || []);
     const specificationsJson = JSON.stringify(p.specifications || {});
 
-    runSql(
-      db,
+    await execute(
       `INSERT INTO products (
         id, name, name_mr, category_id, category_name, base_price, original_price,
         description, description_mr, image, gallery_json, rating, reviews_count,
@@ -162,7 +153,7 @@ productsRouter.post('/', async (req: Request, res: Response) => {
         tags_json, turnaround_days, single_price, bulk_price_100, bulk_price_500,
         bulk_price_1000, is_popular, is_best_seller, quantity_options_json, unit,
         badge, tagline, specifications_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )`,
       [
         id,
         p.name,
@@ -197,34 +188,26 @@ productsRouter.post('/', async (req: Request, res: Response) => {
         specificationsJson
       ]
     );
-    saveDb();
 
-    const created = queryOne(db, `SELECT * FROM products WHERE id = ?`, [id]);
-    res.status(201).json({
-      success: true,
-      product: mapProductRow(created),
-      message: 'Product created successfully'
-    });
+    const created = await queryOne(`SELECT * FROM products WHERE id = ?`, [id]);
+    res.status(201).json({ success: true, product: mapProductRow(created), message: 'Product created successfully' });
   } catch (err: any) {
     console.error('Error creating product:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// PUT /api/products/:id - Update product
 productsRouter.put('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const db = await getDb();
     const p = req.body;
 
-    const existing = queryOne<{ id: string; image: string; gallery_json: string }>(db, `SELECT id, image, gallery_json FROM products WHERE id = ?`, [id]);
+    const existing = await queryOne<{ id: string; image: string; gallery_json: string }>(`SELECT id, image, gallery_json FROM products WHERE id = ?`, [id]);
     if (!existing) {
       return res.status(404).json({ success: false, error: 'Product not found' });
     }
 
-    runSql(
-      db,
+    await execute(
       `UPDATE products 
        SET name = COALESCE(?, name),
            name_mr = COALESCE(?, name_mr),
@@ -292,42 +275,34 @@ productsRouter.put('/:id', async (req: Request, res: Response) => {
         id
       ]
     );
-    saveDb();
 
     const oldImages: string[] = [existing.image];
     try {
       const gallery = JSON.parse(existing.gallery_json || '[]');
       if (Array.isArray(gallery)) oldImages.push(...gallery);
     } catch (_error) {}
-    removeUploadsIfUnused(db, oldImages);
+    await removeUploadsIfUnused(oldImages);
 
-    const updated = queryOne(db, `SELECT * FROM products WHERE id = ?`, [id]);
-    res.json({
-      success: true,
-      product: mapProductRow(updated),
-      message: 'Product updated successfully'
-    });
+    const updated = await queryOne(`SELECT * FROM products WHERE id = ?`, [id]);
+    res.json({ success: true, product: updated ? mapProductRow(updated) : null, message: 'Product updated successfully' });
   } catch (err: any) {
     console.error('Error updating product:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// DELETE /api/products/:id - Delete product
 productsRouter.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const db = await getDb();
-    const existing = queryOne<{ image: string; gallery_json: string }>(db, `SELECT image, gallery_json FROM products WHERE id = ?`, [id]);
-    runSql(db, `DELETE FROM products WHERE id = ?`, [id]);
-    saveDb();
+    const existing = await queryOne<{ image: string; gallery_json: string }>(`SELECT image, gallery_json FROM products WHERE id = ?`, [id]);
+    await execute(`DELETE FROM products WHERE id = ?`, [id]);
     if (existing) {
       const oldImages: string[] = [existing.image];
       try {
         const gallery = JSON.parse(existing.gallery_json || '[]');
         if (Array.isArray(gallery)) oldImages.push(...gallery);
       } catch (_error) {}
-      removeUploadsIfUnused(db, oldImages);
+      await removeUploadsIfUnused(oldImages);
     }
     res.json({ success: true, message: 'Product deleted successfully' });
   } catch (err: any) {

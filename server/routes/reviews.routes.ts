@@ -1,13 +1,12 @@
 import { Router, Request, Response } from 'express';
-import { getDb, saveDb, queryAll, queryOne, runSql } from '../db.js';
+import { execute, queryAll } from '../db.js';
 
 export const reviewsRouter = Router();
 
 // GET /api/reviews - Get all reviews
 reviewsRouter.get('/', async (_req: Request, res: Response) => {
   try {
-    const db = await getDb();
-    const rows = queryAll(db, `SELECT * FROM reviews ORDER BY created_at DESC`);
+    const rows = await queryAll(`SELECT * FROM reviews ORDER BY created_at DESC`);
     const reviews = rows.map((row: any) => ({
       id: row.id,
       customerName: row.customer_name,
@@ -31,12 +30,10 @@ reviewsRouter.get('/', async (_req: Request, res: Response) => {
 // POST /api/reviews - Create review
 reviewsRouter.post('/', async (req: Request, res: Response) => {
   try {
-    const db = await getDb();
     const r = req.body;
     const id = r.id || `REV-${Date.now()}`;
 
-    runSql(
-      db,
+    await execute(
       `INSERT INTO reviews (id, customer_name, customer_role, product_name, rating, comment, date, status, verified_buyer)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -51,7 +48,6 @@ reviewsRouter.post('/', async (req: Request, res: Response) => {
         r.verifiedBuyer !== false ? 1 : 0
       ]
     );
-    saveDb();
 
     res.status(201).json({
       success: true,
@@ -69,10 +65,7 @@ reviewsRouter.patch('/:id/status', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-    const db = await getDb();
-
-    runSql(db, `UPDATE reviews SET status = ? WHERE id = ?`, [status, id]);
-    saveDb();
+    await execute(`UPDATE reviews SET status = ? WHERE id = ?`, [status, id]);
 
     res.json({ success: true, message: `Review status updated to ${status}` });
   } catch (err: any) {
@@ -85,9 +78,7 @@ reviewsRouter.patch('/:id/status', async (req: Request, res: Response) => {
 reviewsRouter.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const db = await getDb();
-    runSql(db, `DELETE FROM reviews WHERE id = ?`, [id]);
-    saveDb();
+    await execute(`DELETE FROM reviews WHERE id = ?`, [id]);
 
     res.json({ success: true, message: 'Review deleted' });
   } catch (err: any) {

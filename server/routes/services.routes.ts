@@ -1,13 +1,12 @@
 import { Router, Request, Response } from 'express';
-import { getDb, saveDb, queryAll, queryOne, runSql } from '../db.js';
+import { execute, queryAll } from '../db.js';
 
 export const servicesRouter = Router();
 
 // GET /api/services - Get all services
 servicesRouter.get('/', async (_req: Request, res: Response) => {
   try {
-    const db = await getDb();
-    const rows = queryAll(db, `SELECT * FROM services ORDER BY created_at ASC`);
+    const rows = await queryAll(`SELECT * FROM services ORDER BY created_at ASC`);
     const services = rows.map((row: any) => ({
       id: row.id,
       name: row.name,
@@ -31,12 +30,10 @@ servicesRouter.get('/', async (_req: Request, res: Response) => {
 // POST /api/services - Create service
 servicesRouter.post('/', async (req: Request, res: Response) => {
   try {
-    const db = await getDb();
     const s = req.body;
     const id = s.id || `srv-${Date.now()}`;
 
-    runSql(
-      db,
+    await execute(
       `INSERT INTO services (id, name, category, tagline, description, turnaround, min_order, icon_name, badge)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -51,7 +48,6 @@ servicesRouter.post('/', async (req: Request, res: Response) => {
         s.badge || ''
       ]
     );
-    saveDb();
 
     res.status(201).json({
       success: true,
@@ -68,11 +64,9 @@ servicesRouter.post('/', async (req: Request, res: Response) => {
 servicesRouter.put('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const db = await getDb();
     const s = req.body;
 
-    runSql(
-      db,
+    await execute(
       `UPDATE services 
        SET name = COALESCE(?, name),
            category = COALESCE(?, category),
@@ -95,7 +89,6 @@ servicesRouter.put('/:id', async (req: Request, res: Response) => {
         id
       ]
     );
-    saveDb();
 
     res.json({ success: true, message: 'Service updated successfully' });
   } catch (err: any) {
@@ -108,9 +101,7 @@ servicesRouter.put('/:id', async (req: Request, res: Response) => {
 servicesRouter.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const db = await getDb();
-    runSql(db, `DELETE FROM services WHERE id = ?`, [id]);
-    saveDb();
+    await execute(`DELETE FROM services WHERE id = ?`, [id]);
 
     res.json({ success: true, message: 'Service deleted successfully' });
   } catch (err: any) {

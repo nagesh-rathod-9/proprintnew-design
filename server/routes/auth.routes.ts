@@ -1,16 +1,18 @@
+import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
-import { getDb, saveDb, queryAll, queryOne, runSql } from '../db.js';
+import { getDb, queryOne, execute, withTransaction } from '../db.js';
 import { rateLimiter } from '../middleware/rateLimiter.js';
 import { createAuthToken } from '../middleware/auth.js';
 
 export const authRouter = Router();
 
-// Rate limiter for auth endpoints: 40 requests per minute per IP
 const authLimiter = rateLimiter({
   windowMs: 60 * 1000,
   maxRequests: 40,
   message: 'Too many authentication attempts. Please slow down.'
 });
+
+const hashPassword = (password: string) => crypto.createHash('sha256').update(password).digest('hex');
 
 const mapUserRow = (row: any) => {
   let addresses = [];
@@ -50,7 +52,6 @@ const mapUserRow = (row: any) => {
 
 const ADMIN_PHONES = new Set(['7666969836', '9623458919']);
 
-// POST /api/auth/login - Phone-based login. The verified phone determines the role.
 authRouter.post('/login', authLimiter, async (req: Request, res: Response) => {
   try {
     const cleanPhone = String(req.body.phone || req.body.username || '').replace(/\D/g, '').slice(-10);
@@ -60,22 +61,21 @@ authRouter.post('/login', authLimiter, async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'A valid 10-digit mobile number is required' });
     }
 
-    const db = await getDb();
-    const existing = queryOne<any>(db, `SELECT * FROM users WHERE phone = ? LIMIT 1`, [cleanPhone]);
+    const existing = await queryOne<any>(`SELECT * FROM users WHERE phone = ? LIMIT 1`, [cleanPhone]);
     const role = ADMIN_PHONES.has(cleanPhone) || existing?.role === 'admin' ? 'admin' : 'customer';
     const userId = existing?.id || `user-${cleanPhone}`;
     const userName = name || existing?.name || (role === 'admin' ? 'Admin Manager' : 'Customer');
     const email = existing?.email || `${cleanPhone}@proprint.in`;
 
-    if (existing) {
-      runSql(db, `UPDATE users SET name = ?, role = ?, email = ? WHERE id = ?`, [userName, role, email, userId]);
-    } else {
-      runSql(db, `INSERT INTO users (id, name, email, phone, role, company_name, shipping_address, city, pincode)
-        VALUES (?, ?, ?, ?, ?, '', '', '', '')`, [userId, userName, email, cleanPhone, role]);
-    }
-    saveDb();
+    await withTransaction(async (connection) => {
+      if (existing) {
+        await connection.execute(`UPDATE users SET name = ?, role = ?, email = ? WHERE id = ?`, [userName, role, email, userId]);
+      } else {
+        await connection.execute(`INSERT INTO users (id, name, email, phone, role, company_name, shipping_address, city, pincode) VALUES (?, ?, ?, ?, ?, '', '', '', '')`, [userId, userName, email, cleanPhone, role]);
+      }
+    });
 
-    const created = queryOne(db, `SELECT * FROM users WHERE id = ?`, [userId]);
+    const created = await queryOne<any>(`SELECT * FROM users WHERE id = ?`, [userId]);
     const mapped = mapUserRow(created);
     return res.json({
       success: true,
@@ -89,7 +89,6 @@ authRouter.post('/login', authLimiter, async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/auth/register - Register new user
 authRouter.post('/register', authLimiter, async (req: Request, res: Response) => {
   try {
     const { name, email, phone, password, companyName, gstNumber, shippingAddress, city, pincode } = req.body;
@@ -99,9 +98,7 @@ authRouter.post('/register', authLimiter, async (req: Request, res: Response) =>
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const db = await getDb();
-
-    const existing = queryOne(db, `SELECT id FROM users WHERE LOWER(email) = ? LIMIT 1`, [cleanEmail]);
+    const existing = await queryOne<any>(`SELECT id FROM users WHERE LOWER(email) = ? LIMIT 1`, [cleanEmail]);
     if (existing) {
       return res.status(409).json({ success: false, error: 'An account with this email already exists. Please log in.' });
     }
@@ -113,20 +110,18 @@ authRouter.post('/register', authLimiter, async (req: Request, res: Response) =>
     }
     const role = ADMIN_PHONES.has(cleanPhone) ? 'admin' : 'customer';
 
-    const defaultAddresses = [
-      {
-        id: `addr-${Date.now()}`,
-        name: name.trim(),
-        phone: cleanPhone,
-        address: shippingAddress || 'Chhatrapati Sambhajinagar',
-        city: city || 'Chhatrapati Sambhajinagar',
-        pincode: pincode || '431001',
-        isDefault: true
-      }
-    ];
+    const defaultAddresses = [{
+      id: `addr-${Date.now()}`,
+      name: name.trim(),
+      phone: cleanPhone,
+      address: shippingAddress || 'Chhatrapati Sambhajinagar',
+      city: city || 'Chhatrapati Sambhajinagar',
+      pincode: pincode || '431001',
+      isDefault: true
+    }];
 
-    runSql(
-      db,
+    const passwordHash = hashPassword(String(password));
+    await execute(
       `INSERT INTO users (id, name, email, phone, role, company_name, gst_number, shipping_address, city, pincode, addresses_json, password_hash)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -141,12 +136,11 @@ authRouter.post('/register', authLimiter, async (req: Request, res: Response) =>
         city || 'Chhatrapati Sambhajinagar',
         pincode || '431001',
         JSON.stringify(defaultAddresses),
-        password
+        passwordHash
       ]
     );
-    saveDb();
 
-    const createdUser = queryOne(db, `SELECT * FROM users WHERE id = ?`, [newId]);
+    const createdUser = await queryOne<any>(`SELECT * FROM users WHERE id = ?`, [newId]);
     return res.status(201).json({
       success: true,
       role,

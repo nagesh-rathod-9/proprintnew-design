@@ -132,7 +132,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       uploadedIsImage: uploadedIsImage,
       specialInstructions: specialNotes,
       calculatedPrice: calculatedTotal,
-      turnaroundDays: product.turnaroundDays || '1-2'
+      turnaroundDays: product.turnaroundDays || 1
     };
 
     addToCart(product, customization);

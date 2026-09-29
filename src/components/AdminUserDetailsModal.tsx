@@ -31,7 +31,7 @@ interface AdminUserDetailsModalProps {
   orders: Order[];
   isOpen: boolean;
   onClose: () => void;
-  onUpdateUser?: (updated: Partial<User>) => Promise<boolean> | void;
+  onUpdateUser?: (updated: Partial<User>) => Promise<void | boolean> | void;
   onDeleteUser?: (userId: string) => void;
   showToast: (msg: string, type?: 'success' | 'info' | 'error') => void;
 }
