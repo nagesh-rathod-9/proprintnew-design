@@ -43,13 +43,13 @@ export const TrustBadges: React.FC = () => {
   return (
     <section id="trust-benefits-strip" className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
       <div className="bg-white rounded-xl sm:rounded-2xl border border-[#E7EAF0] p-4 sm:p-6 shadow-xs">
-        <div className="flex lg:grid overflow-x-auto lg:overflow-visible lg:grid-cols-4 gap-4 sm:gap-6 lg:divide-x divide-slate-100 pb-1 lg:pb-0 scrollbar-none snap-x">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:divide-x divide-slate-100">
           {benefits.map((item, idx) => {
             const Icon = item.icon;
             return (
               <div
                 key={item.id}
-                className={`flex-none w-[240px] sm:w-[260px] lg:w-auto snap-start flex items-start gap-3.5 ${
+                className={`min-w-0 flex items-start gap-3.5 ${
                   idx !== 0 ? 'lg:pl-6' : ''
                 }`}
               >

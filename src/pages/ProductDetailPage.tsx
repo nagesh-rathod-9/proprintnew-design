@@ -31,7 +31,6 @@ import {
 import { useApp, apiFetch, getFullImageUrl } from '../context/AppContext';
 import { Product } from '../types';
 import { Breadcrumbs } from '../components/Breadcrumbs';
-import { WhatsAppModal } from '../components/WhatsAppModal';
 import { ReviewCard } from '../components/ReviewCard';
 import { NotFoundPage } from './NotFoundPage';
 
@@ -199,7 +198,6 @@ export const ProductDetailPage: React.FC = () => {
   const [uploadedIsImage, setUploadedIsImage] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'features' | 'specs' | 'delivery' | 'reviews'>('features');
-  const [isWhatsAppOpen, setIsWhatsAppOpen] = useState(false);
 
   // Price Calculation with Single and Bulk Price Tiers
   const finishMultiplier = selectedFinish.priceMultiplier || 1.0;
@@ -812,7 +810,7 @@ Hello Proprint Team, please confirm this order, share the digital proof, and pro
             </div>
 
             {/* Direct Artwork File Upload Box */}
-            <div className="p-3.5 bg-slate-50 rounded-2xl border border-dashed border-slate-300 hover:border-[#FF0038] transition-colors">
+            <div className="p-3.5 bg-rose-50/60 rounded-2xl border border-dashed border-rose-300 hover:border-[#FF0038] transition-colors">
               <label className="cursor-pointer flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-[#FF0038] shrink-0">
@@ -820,17 +818,17 @@ Hello Proprint Team, please confirm this order, share the digital proof, and pro
                   </div>
                   <div className="truncate">
                     <span className="text-xs font-bold text-slate-900 block truncate">
-                      {uploadedFileName ? uploadedFileName : 'Attach Ready Print Artwork (Optional)'}
+                      {uploadedFileName ? uploadedFileName : 'Attach Your Design'}
                     </span>
-                    <span className="text-[10px] text-slate-400">
+                    <span className="text-[10px] text-slate-500">
                       {uploadedFileName
                         ? `${uploadedFileNames.length || 1} file${(uploadedFileNames.length || 1) > 1 ? 's' : ''} attached • Add more`
-                        : 'PDF, AI, CDR, PSD or ZIP up to 100MB'}
+                        : 'Optional • PDF, AI, CDR, PSD or ZIP up to 100MB'}
                     </span>
                   </div>
                 </div>
-                <span className="px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 rounded-lg text-xs font-bold text-slate-700 shrink-0">
-                  {uploadedFileName ? 'Attach more' : 'Browse'}
+                <span className="px-3 py-1.5 bg-[#E90046] hover:bg-[#d0003e] rounded-lg text-xs font-bold text-white shrink-0 transition-colors">
+                  {uploadedFileName ? 'Add more' : 'Choose file'}
                 </span>
                 <input
                   type="file"
@@ -871,29 +869,8 @@ Hello Proprint Team, please confirm this order, share the digital proof, and pro
                 className="w-full py-3.5 px-6 rounded-xl bg-[#25D366] hover:bg-[#20ba59] active:scale-[0.98] text-slate-950 font-bold text-xs uppercase tracking-wider shadow-md shadow-emerald-600/15 transition-all cursor-pointer text-center flex items-center justify-center gap-2 border border-emerald-500/40"
               >
                 <MessageSquare className="w-4 h-4 fill-slate-950 text-slate-950" />
-                <span>{isMarathi ? 'व्हॉट्सॲपवर ऑर्डर द्या (Order on WhatsApp)' : 'Order on WhatsApp (Instant Proof & Rate)'}</span>
+                <span>{isMarathi ? 'व्हॉट्सॲपवर ऑर्डर द्या' : 'Order on WhatsApp'}</span>
               </button>
-
-              {/* Secondary Options */}
-              <div className="flex items-center gap-2 pt-0.5">
-                <Link
-                  to="/design-studio"
-                  className="flex-1 py-2.5 px-3 rounded-xl bg-white border border-slate-200 hover:border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-medium transition-all text-center flex items-center justify-center gap-1.5 shadow-2xs"
-                >
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-rose-600" />
-                  <span>{isMarathi ? '३डी स्टुडिओमध्ये कस्टमाइझ करा' : 'Customize in 3D Studio'}</span>
-                </Link>
-
-                <button
-                  type="button"
-                  onClick={() => setIsWhatsAppOpen(true)}
-                  className="py-2.5 px-3.5 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                  title="In-App Desk Helper"
-                >
-                  <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
-                  <span className="hidden sm:inline">{isMarathi ? 'इतर चौकशी' : 'Help Desk'}</span>
-                </button>
-              </div>
             </div>
 
             {/* In stock & Dispatch details */}
@@ -1200,13 +1177,6 @@ Hello Proprint Team, please confirm this order, share the digital proof, and pro
           </button>
         </div>
       </div>
-
-      {/* WhatsApp / Instant Inquiry In-App Modal */}
-      <WhatsAppModal
-        isOpen={isWhatsAppOpen}
-        onClose={() => setIsWhatsAppOpen(false)}
-        defaultMessage={`Hi Proprint! I want to inquire about custom bulk rate and specs for: ${product.name}`}
-      />
 
     </div>
   );

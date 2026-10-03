@@ -84,6 +84,11 @@
   animation: topBarSlide 1s ease-in-out infinite;
 }
 
+svg.lucide-sparkles,
+svg.lucide-sparkle {
+  display: none !important;
+}
+
 /* Print Styles for Delivery Box Labels & Tax Invoices */
 @media print {
   body {

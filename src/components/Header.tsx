@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import { 
   Search, 
   ShoppingCart, 
@@ -17,11 +18,10 @@ import {
   CheckCircle,
   Truck,
   Phone,
-  Sparkles
 } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { apiFetch, getFullImageUrl, useApp } from '../context/AppContext';
 import { ProprintLogo } from './ProprintLogo';
-import { Product } from '../types';
+import { Category, Product } from '../types';
 
 interface HeaderProps {
   onOpenCart: () => void;
@@ -46,12 +46,9 @@ export const Header: React.FC<HeaderProps> = ({
     setSearchQuery, 
     currentUser, 
     logout, 
-    language,
-    setLanguage,
     isMarathi,
     isGlobalLoading,
     products: appProducts = [],
-    categories: appCategories = []
   } = useApp();
   
   const navigate = useNavigate();
@@ -62,6 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [allCategoriesDropdownOpen, setAllCategoriesDropdownOpen] = useState(false);
   const [productsDropdownOpen, setProductsDropdownOpen] = useState(false);
+  const [navCategories, setNavCategories] = useState<Category[]>([]);
   const [servicesDropdownOpen, setServicesDropdownOpen] = useState(false);
   const [filteredSearchResults, setFilteredSearchResults] = useState<Product[]>([]);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
@@ -73,6 +71,43 @@ export const Header: React.FC<HeaderProps> = ({
   const servicesRef = useRef<HTMLDivElement>(null);
 
   const cartItemsCount = Array.isArray(cart) ? cart.length : 0;
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    apiFetch('/api/categories')
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Category API request failed');
+        const data = await response.json();
+        const categories = Array.isArray(data.categories) ? data.categories : [];
+
+        if (isCurrent) {
+          setNavCategories(
+            categories.map((category: Category) => ({
+              ...category,
+              image: category.image ? getFullImageUrl(category.image) : ''
+            }))
+          );
+        }
+      })
+      .catch(() => {
+        if (isCurrent) setNavCategories([]);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+
+  const activeProductCategory = new URLSearchParams(location.search).get('category');
+  const isProductsActive =
+    productsDropdownOpen ||
+    location.pathname === '/products' ||
+    location.pathname.startsWith('/product/') ||
+    location.pathname === '/visiting-cards';
+  const isServicesActive = servicesDropdownOpen;
+  const isDesignWorkActive = location.pathname.startsWith('/portfolio');
+  const isAllProductsActive = location.pathname === '/products' && !activeProductCategory;
 
   // Search auto-complete logic
   useEffect(() => {
@@ -135,7 +170,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header id="main-header" className="sticky top-0 z-40 w-full bg-white shadow-xs">
+    <header id="main-header" className="sticky top-0 z-50 w-full bg-white shadow-xs">
       
       {/* ============================================================ */}
       {/* LEVEL 1: TOP MAIN HEADER (Dark Navy: #080D1C)               */}
@@ -146,22 +181,13 @@ export const Header: React.FC<HeaderProps> = ({
           
           {/* Left: Mobile Toggle & Brand Logo */}
           <div className="flex items-center gap-3 shrink-0">
-            <button
-              id="mobile-menu-toggle-btn"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-1.5 -ml-1 text-slate-200 hover:text-white rounded-lg lg:hidden cursor-pointer"
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-
             <Link to="/" className="flex items-center group py-0.5" aria-label="Proprint Home">
               <ProprintLogo size="md" variant="light" showTagline={true} />
             </Link>
           </div>
 
           {/* Center: Search Bar (Desktop) matching reference exactly */}
-          <div ref={searchContainerRef} className="hidden lg:flex flex-1 max-w-xl xl:max-w-2xl mx-2 xl:mx-6 relative">
+          <div ref={searchContainerRef} className="hidden">
             <form onSubmit={handleSearchSubmit} className="w-full flex items-center relative">
               <input
                 type="text"
@@ -236,33 +262,11 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Mobile Search Toggle Icon */}
             <button
               onClick={() => setMobileSearchOpen(!mobileSearchOpen)}
-              className="lg:hidden p-2 text-slate-300 hover:text-white rounded-lg cursor-pointer"
+              className="hidden"
               aria-label="Toggle search"
             >
               <Search className="w-5 h-5" />
             </button>
-
-            {/* Language Switcher Capsule [ EN | MR ] */}
-            <div className="hidden sm:flex items-center bg-slate-900 border border-slate-700/80 rounded-full p-0.5 text-[11px]">
-              <button
-                type="button"
-                onClick={() => setLanguage('en')}
-                className={`px-2 py-0.5 rounded-full font-semibold transition-all cursor-pointer ${
-                  language === 'en' ? 'bg-[#E90046] text-white' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                EN
-              </button>
-              <button
-                type="button"
-                onClick={() => setLanguage('mr')}
-                className={`px-2 py-0.5 rounded-full font-semibold transition-all cursor-pointer ${
-                  language === 'mr' ? 'bg-[#E90046] text-white' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                मराठी
-              </button>
-            </div>
 
             {/* Login / User Account */}
             <div ref={userMenuRef} className="relative">
@@ -293,13 +297,6 @@ export const Header: React.FC<HeaderProps> = ({
                         >
                           <User className="w-4 h-4 text-[#E90046]" />
                           <span>{isMarathi ? 'माझी प्रोफाइल' : 'My Profile'}</span>
-                        </Link>
-                        <Link
-                          to="/orders"
-                          onClick={() => setUserDropdownOpen(false)}
-                          className="flex items-center gap-2 px-3.5 py-2 text-slate-200 hover:text-white hover:bg-slate-800/80 transition-colors"
-                        >
-                          <Package className="w-4 h-4 text-amber-400" />
                           <span>{isMarathi ? 'माझ्या ऑर्डर्स' : 'My Orders'}</span>
                         </Link>
                         {currentUser.role === 'admin' && (
@@ -341,11 +338,22 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
+            <button
+              id="mobile-menu-toggle-btn"
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className={`relative z-[60] p-2 rounded-lg cursor-pointer lg:hidden ${mobileMenuOpen ? 'text-slate-700 hover:text-slate-950' : 'text-slate-200 hover:text-white'}`}
+              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={mobileMenuOpen}
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+
             {/* Cart with Counter Badge */}
             <button
               id="header-cart-btn"
               onClick={onOpenCart}
-              className="flex items-center gap-1.5 text-xs sm:text-[13px] font-medium text-slate-200 hover:text-white transition-colors cursor-pointer px-2 py-1.5 rounded-lg hover:bg-slate-800/60 relative"
+              className="hidden"
               aria-label="Cart"
             >
               <div className="relative">
@@ -390,11 +398,11 @@ export const Header: React.FC<HeaderProps> = ({
       {/* LEVEL 2: NAVIGATION BAR (White: #FFFFFF, Border: #E7EAF0)    */}
       {/* All Categories Button | Products | Services | Portfolio | ...*/}
       {/* ============================================================ */}
-      <div className="hidden lg:block w-full bg-white border-b border-[#E7EAF0]">
-        <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between gap-6">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 hidden h-[72px] items-center justify-center lg:flex">
+        <div className="pointer-events-auto flex h-full w-full max-w-[1440px] items-center justify-center px-4 sm:px-6 lg:px-8">
           
           {/* Left: Solid Pink "All Categories" Button with Dropdown */}
-          <div ref={categoriesRef} className="relative shrink-0">
+          <div ref={categoriesRef} className="hidden">
             <button
               onClick={() => setAllCategoriesDropdownOpen(!allCategoriesDropdownOpen)}
               className="bg-[#E90046] hover:bg-[#d0003e] active:scale-98 text-white font-bold text-xs sm:text-[13px] px-4 py-2 rounded-lg flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
@@ -480,63 +488,53 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Center Navigation Links: Products ⌵ | Services ⌵ | Design Portfolio | Business Solutions | About Us | Support */}
-          <nav className="flex items-center gap-6 xl:gap-8 text-[13px] font-medium text-[#0F172A]">
+          <nav className="flex items-center gap-5 xl:gap-7 text-[12px] xl:text-[13px] font-semibold text-white">
             
             {/* Products Dropdown */}
-            <div ref={productsRef} className="relative">
+              <div
+                ref={productsRef}
+                className="relative"
+                onMouseEnter={() => setProductsDropdownOpen(true)}
+                onMouseLeave={() => setProductsDropdownOpen(false)}
+              >
               <button
                 onClick={() => setProductsDropdownOpen(!productsDropdownOpen)}
-                className="flex items-center gap-1 hover:text-[#E90046] transition-colors py-1 cursor-pointer font-medium"
+                className={`flex items-center gap-1 rounded-lg px-3 py-2 transition-colors cursor-pointer ${isProductsActive ? 'bg-[#E90046] text-white shadow-sm' : 'text-slate-100 hover:bg-slate-800 hover:text-white'}`}
               >
                 <span>{isMarathi ? 'उत्पादने' : 'Products'}</span>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${productsDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {productsDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 text-xs text-slate-700 divide-y divide-slate-100 animate-in fade-in duration-100">
-                  <div className="py-1">
+                <div className="absolute top-full left-0 w-[196px] rounded-xl border border-slate-200 bg-white p-1.5 pt-2 shadow-xl z-50 text-[11px] text-slate-700 animate-in fade-in duration-100">
+                  <div className="space-y-0.5">
                     <Link
                       to="/products"
                       onClick={() => setProductsDropdownOpen(false)}
-                      className="block px-4 py-2 font-bold text-[#E90046] hover:bg-rose-50"
+                      className={`flex items-center gap-2 rounded-lg px-2 py-2 font-semibold ${isAllProductsActive ? 'bg-rose-50 text-[#E90046]' : 'text-slate-700 hover:bg-slate-50'}`}
                     >
+                      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white text-[#E90046]">
+                        <Layers className="h-4 w-4" />
+                      </span>
                       All Products Overview
                     </Link>
-                    <Link
-                      to="/products?category=visiting-cards"
-                      onClick={() => setProductsDropdownOpen(false)}
-                      className="block px-4 py-1.5 hover:bg-slate-50 hover:text-[#E90046]"
-                    >
-                      Premium Visiting Cards
-                    </Link>
-                    <Link
-                      to="/products?category=packaging"
-                      onClick={() => setProductsDropdownOpen(false)}
-                      className="block px-4 py-1.5 hover:bg-slate-50 hover:text-[#E90046]"
-                    >
-                      Packaging Boxes
-                    </Link>
-                    <Link
-                      to="/products?category=brochures"
-                      onClick={() => setProductsDropdownOpen(false)}
-                      className="block px-4 py-1.5 hover:bg-slate-50 hover:text-[#E90046]"
-                    >
-                      Brochures & Catalogs
-                    </Link>
-                    <Link
-                      to="/products?category=stickers"
-                      onClick={() => setProductsDropdownOpen(false)}
-                      className="block px-4 py-1.5 hover:bg-slate-50 hover:text-[#E90046]"
-                    >
-                      Waterproof Stickers
-                    </Link>
-                    <Link
-                      to="/visiting-cards"
-                      onClick={() => setProductsDropdownOpen(false)}
-                      className="block px-4 py-1.5 text-amber-700 font-semibold hover:bg-amber-50"
-                    >
-                      ✨ 3D Visiting Card Customizer
-                    </Link>
+                    {navCategories.map((category) => (
+                      <Link
+                        key={category.id}
+                        to={`/products?category=${encodeURIComponent(category.id)}`}
+                        onClick={() => setProductsDropdownOpen(false)}
+                        className={`flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 hover:text-[#E90046] ${activeProductCategory === category.id ? 'bg-slate-50 text-[#E90046]' : ''}`}
+                      >
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-md bg-slate-100">
+                          {category.image ? (
+                            <img src={category.image} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <Package className="h-3.5 w-3.5 text-slate-500" />
+                          )}
+                        </span>
+                        <span className="truncate">{isMarathi ? category.nameMr || category.name : category.name}</span>
+                      </Link>
+                    ))}
                   </div>
                 </div>
               )}
@@ -546,7 +544,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div ref={servicesRef} className="relative">
               <button
                 onClick={() => setServicesDropdownOpen(!servicesDropdownOpen)}
-                className="flex items-center gap-1 hover:text-[#E90046] transition-colors py-1 cursor-pointer font-medium"
+                className={`flex items-center gap-1 rounded-lg px-3 py-2 transition-colors cursor-pointer ${servicesDropdownOpen ? 'bg-[#E90046] text-white shadow-sm' : 'text-slate-100 hover:bg-slate-800 hover:text-white'}`}
               >
                 <span>{isMarathi ? 'सेवा' : 'Services'}</span>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${servicesDropdownOpen ? 'rotate-180' : ''}`} />
@@ -597,38 +595,41 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Design Portfolio */}
             <Link
               to="/portfolio"
-              className="hover:text-[#E90046] transition-colors font-medium"
+              className={`rounded-lg px-3 py-2 transition-colors ${location.pathname.startsWith('/portfolio') ? 'bg-[#E90046] text-white' : 'text-slate-100 hover:bg-slate-800 hover:text-white'}`}
             >
-              {isMarathi ? 'डिझाईन पोर्टफोलिओ' : 'Design Portfolio'}
+              {isMarathi ? 'डिझाईन पोर्टफोलिओ' : 'Design Work'}
             </Link>
 
             {/* Business Solutions */}
             <button
               onClick={onOpenQuote}
-              className="hover:text-[#E90046] transition-colors font-medium cursor-pointer"
+              className="hidden"
             >
               {isMarathi ? 'बिझनेस सोल्यूशन्स' : 'Business Solutions'}
             </button>
 
             {/* About Us */}
-            <a
-              href="#about"
-              onClick={(e) => {
-                const el = document.getElementById('about');
-                if (el) {
-                  e.preventDefault();
-                  el.scrollIntoView({ behavior: 'smooth' });
-                }
-              }}
-              className="hover:text-[#E90046] transition-colors font-medium"
+            <button
+              type="button"
+              onClick={() => navigate('/#trust-benefits-strip')}
+              className="rounded-lg px-3 py-2 text-slate-100 transition-colors hover:bg-slate-800 hover:text-white"
             >
               {isMarathi ? 'आमच्याबद्दल' : 'About Us'}
-            </a>
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenWhatsApp}
+              className="rounded-lg px-3 py-2 text-slate-100 transition-colors hover:bg-slate-800 hover:text-white"
+              aria-label="Contact Proprint"
+            >
+              Contact
+            </button>
 
             {/* Support */}
             <button
               onClick={onOpenTrackOrder}
-              className="hover:text-[#E90046] transition-colors font-medium cursor-pointer"
+              className="hidden"
             >
               {isMarathi ? 'सपोर्ट' : 'Support'}
             </button>
@@ -638,7 +639,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Far Right: WhatsApp Us */}
           <button
             onClick={onOpenWhatsApp}
-            className="flex items-center gap-1.5 text-xs sm:text-[13px] font-bold text-[#25D366] hover:text-[#1ebd59] transition-colors cursor-pointer shrink-0"
+            className="hidden"
             aria-label="WhatsApp Us"
           >
             <svg 
@@ -657,44 +658,34 @@ export const Header: React.FC<HeaderProps> = ({
       {/* ============================================================ */}
       {/* MOBILE NAVIGATION DRAWER (Slide-over sheet)                  */}
       {/* ============================================================ */}
+      <AnimatePresence>
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden flex">
-          <div 
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity" 
-            onClick={() => setMobileMenuOpen(false)}
-          />
-
-          <div className="relative w-4/5 max-w-sm bg-[#080D1C] text-white h-full shadow-2xl z-50 flex flex-col justify-between overflow-y-auto p-5 border-r border-slate-800">
+        <motion.div
+          key="header-navigation"
+          initial={{ y: '-100%' }}
+          animate={{ y: 0 }}
+          exit={{ y: '-100%' }}
+          transition={{ duration: 0.3, ease: 'easeOut' }}
+          className="fixed inset-0 z-40 bg-white text-slate-900 overflow-y-auto"
+        >
+          <div className="min-h-full max-w-[1440px] mx-auto flex flex-col justify-between p-5">
             <div className="space-y-6">
               
               {/* Drawer Header */}
-              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                <ProprintLogo size="sm" variant="light" showTagline={true} />
-                <button
+              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                <Link
+                  to="/"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-white rounded-lg cursor-pointer"
+                  className="inline-flex flex-col items-start"
+                  aria-label="Proprint Home"
                 >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Language Switcher in Drawer */}
-              <div className="flex items-center justify-between bg-slate-900 px-3 py-2 rounded-xl border border-slate-800">
-                <span className="text-xs text-slate-300 font-medium">Language / भाषा:</span>
-                <div className="flex items-center bg-black/40 border border-slate-700 rounded-full p-0.5">
-                  <button
-                    onClick={() => setLanguage('en')}
-                    className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${language === 'en' ? 'bg-[#E90046] text-white' : 'text-slate-400'}`}
-                  >
-                    EN
-                  </button>
-                  <button
-                    onClick={() => setLanguage('mr')}
-                    className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${language === 'mr' ? 'bg-[#E90046] text-white' : 'text-slate-400'}`}
-                  >
-                    मराठी
-                  </button>
-                </div>
+                  <span className="mb-1 h-0.5 w-16 rounded-full bg-[#E90046]" />
+                  <span className="text-xl font-black leading-none">
+                    <span className="text-slate-900">pro</span>
+                    <span className="text-[#E90046]">print</span>
+                  </span>
+                  <span className="mt-1 text-[7px] tracking-[2px] text-slate-500">FOR ALL PRINTING SOLUTIONS</span>
+                </Link>
               </div>
 
               {/* Navigation Links */}
@@ -702,49 +693,49 @@ export const Header: React.FC<HeaderProps> = ({
                 <Link
                   to="/"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block px-3 py-2 rounded-lg text-slate-200 hover:bg-slate-800"
+                  className="block rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-950"
                 >
                   Home
                 </Link>
                 <Link
                   to="/products"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block px-3 py-2 rounded-lg text-slate-200 hover:bg-slate-800"
+                  className="block rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-950"
                 >
                   All Products
                 </Link>
-                <Link
-                  to="/products?category=visiting-cards"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block px-3 py-2 rounded-lg text-slate-200 hover:bg-slate-800"
-                >
-                  Visiting Cards
-                </Link>
-                <Link
-                  to="/products?category=packaging"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block px-3 py-2 rounded-lg text-slate-200 hover:bg-slate-800"
-                >
-                  Packaging Boxes
-                </Link>
-                <Link
-                  to="/products?category=brochures"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block px-3 py-2 rounded-lg text-slate-200 hover:bg-slate-800"
-                >
-                  Flyers & Brochures
-                </Link>
+                <div className="max-h-[40vh] space-y-1 overflow-y-auto border-y border-slate-200 py-2">
+                  {navCategories.map((category) => (
+                    <Link
+                      key={category.id}
+                      to={`/products?category=${encodeURIComponent(category.id)}`}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-950"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-slate-100">
+                        {category.image ? (
+                          <img src={category.image} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <Package className="h-4 w-4 text-slate-500" />
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate">
+                        {isMarathi ? category.nameMr || category.name : category.name}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
                 <Link
                   to="/portfolio"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block px-3 py-2 rounded-lg text-slate-200 hover:bg-slate-800"
+                  className="block rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-950"
                 >
                   Design Portfolio
                 </Link>
                 <Link
                   to="/orders"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block px-3 py-2 rounded-lg text-slate-200 hover:bg-slate-800"
+                  className="block rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-950"
                 >
                   My Orders
                 </Link>
@@ -760,7 +751,7 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
 
               {/* CTAs */}
-              <div className="space-y-2.5 pt-4 border-t border-slate-800">
+              <div className="space-y-2.5 border-t border-slate-200 pt-4">
                 <button
                   onClick={() => {
                     setMobileMenuOpen(false);
@@ -785,14 +776,15 @@ export const Header: React.FC<HeaderProps> = ({
 
             </div>
 
-            <div className="text-[11px] text-slate-400 border-t border-slate-800 pt-4">
-              <p className="font-semibold text-white">Proprint Printing Solutions</p>
+            <div className="border-t border-slate-200 pt-4 text-[11px] text-slate-500">
+              <p className="font-semibold text-slate-900">Proprint Printing Solutions</p>
               <p>support@proprint.in • +91 93212 00095</p>
             </div>
 
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* Dynamic Global Loading Line */}
       {isGlobalLoading && (

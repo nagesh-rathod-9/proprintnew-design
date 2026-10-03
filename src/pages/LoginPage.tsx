@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Breadcrumbs } from '../components/Breadcrumbs';
+import loginBackground from '../assets/images/loginbg.png';
 
 export const LoginPage: React.FC = () => {
   const {
@@ -284,13 +285,16 @@ export const LoginPage: React.FC = () => {
   );
 
   return (
-    <div className="h-[100dvh] w-full overflow-hidden bg-[#f7f8fb] text-slate-900 font-marathi">
+    <div
+      className="relative min-h-[100dvh] w-full bg-cover bg-no-repeat bg-[position:65%_center] lg:bg-center text-slate-900 font-marathi"
+      style={{ backgroundImage: `url(${loginBackground})` }}
+    >
 
       {/* ================================================================
           ALREADY LOGGED IN
       ================================================================= */}
       {currentUser && !showLoginFormAnyway ? (
-        <div className="h-full w-full flex items-center justify-center p-4 sm:p-6">
+        <div className="min-h-[100dvh] w-full flex items-center justify-center p-4 sm:p-6">
 
           <div className="w-full max-w-xl bg-white rounded-[28px] shadow-[0_20px_60px_rgba(15,23,42,0.10)] border border-slate-200 overflow-hidden">
 
@@ -464,12 +468,12 @@ export const LoginPage: React.FC = () => {
         /* ================================================================
            LOGIN
         ================================================================= */
-        <div className="h-full w-full flex flex-col lg:flex-row">
+        <div className="min-h-[100dvh] w-full">
 
           {/* ============================================================
               LEFT BRAND PANEL - DESKTOP
           ============================================================= */}
-          <div className="hidden lg:flex lg:w-[46%] xl:w-[48%] relative overflow-hidden bg-[#08111f] text-white">
+          <div className="hidden">
 
             {/* Decorative glow */}
             <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-[#ff0038]/10 blur-3xl" />
@@ -595,12 +599,12 @@ export const LoginPage: React.FC = () => {
           {/* ============================================================
               RIGHT LOGIN PANEL
           ============================================================= */}
-          <div className="flex-1 h-full overflow-hidden flex items-center justify-center p-3 sm:p-5 lg:p-8 xl:p-12 bg-[#f8f9fc]">
+          <div className="relative flex-1 min-h-[100dvh] overflow-y-auto flex items-center justify-center p-4 sm:p-6">
 
-            <div className="w-full max-w-[560px] max-h-full flex flex-col">
+            <div className="w-full max-w-[360px] flex flex-col py-6">
 
               {/* Top Navigation & Breadcrumbs */}
-              <div className="flex items-center justify-between mb-3 px-1 shrink-0">
+              <div className="hidden">
                 <Breadcrumbs
                   items={[
                     { label: isMarathi ? 'मुख्यपृष्ठ' : 'Home', to: '/' },
@@ -614,13 +618,13 @@ export const LoginPage: React.FC = () => {
               </div>
 
               {/* Login Card */}
-              <div className="bg-white rounded-[24px] sm:rounded-[30px] border border-slate-200 shadow-[0_20px_60px_rgba(15,23,42,0.09)] overflow-hidden">
+              <div className="bg-white/95 backdrop-blur-sm rounded-2xl border border-white shadow-[0_20px_60px_rgba(15,23,42,0.20)] overflow-hidden">
 
                 {/* Card Header */}
                 <div className="px-5 sm:px-8 lg:px-10 pt-5 sm:pt-7 lg:pt-9">
 
                   {/* Desktop Back */}
-                  <div className="hidden lg:flex items-center justify-between mb-6">
+                  <div className="hidden">
 
                     <Link
                       to="/"
@@ -637,7 +641,7 @@ export const LoginPage: React.FC = () => {
                   </div>
 
                   {/* Mobile Logo */}
-                  <div className="lg:hidden text-center mb-2">
+                  <div className="text-center mb-4">
 
                     <div className="inline-flex flex-col items-center">
                       <div className="h-1 w-20 bg-[#ff0038] rounded-full mb-1.5" />
@@ -655,7 +659,7 @@ export const LoginPage: React.FC = () => {
                   </div>
 
                   {/* OTP Icon */}
-                  <div className="flex justify-center mb-3 sm:mb-4">
+                  <div className={step === 'phone' ? 'hidden' : 'flex justify-center mb-3 sm:mb-4'}>
 
                     <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center">
                       <Smartphone className="w-6 h-6 sm:w-7 sm:h-7 text-[#ff0038]" />
@@ -665,30 +669,24 @@ export const LoginPage: React.FC = () => {
 
                   <div className="text-center">
 
-                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
+                    <h2 className={step === 'phone' ? 'hidden' : 'text-xl sm:text-2xl font-black text-slate-900 tracking-tight'}>
                       {step === 'phone'
                         ? 'Welcome to Proprint!'
                         : 'Verify Your Number'}
                     </h2>
 
-                    <p className="mt-1.5 text-xs sm:text-sm text-slate-500 leading-relaxed">
+                    <p className={step === 'phone' ? 'hidden' : 'mt-1.5 text-xs sm:text-sm text-slate-500 leading-relaxed'}>
                       {step === 'phone'
                         ? 'Enter your mobile number to continue.'
                         : `Enter the OTP sent to +91 ${phoneNumber}`}
                     </p>
-
-                    {step === 'phone' && (
-                      <p className="text-xs sm:text-sm text-slate-500">
-                        No password required.
-                      </p>
-                    )}
 
                   </div>
 
                 </div>
 
                 {/* Card Body */}
-                <div className="px-5 sm:px-8 lg:px-10 pb-5 sm:pb-7 lg:pb-9 mt-5 sm:mt-6">
+                <div className="px-5 sm:px-8 pb-5 sm:pb-7 mt-3">
 
                   {/* Error */}
                   {errorMessage && (
@@ -712,17 +710,18 @@ export const LoginPage: React.FC = () => {
 
                         <label
                           htmlFor="login-phone-input"
-                          className="block text-xs sm:text-sm font-bold text-slate-700 mb-2"
+                          className="sr-only"
                         >
                           {isMarathi
                             ? 'मोबाईल नंबर टाका'
                             : 'Enter Mobile Number'}
                         </label>
 
-                        <div className="flex h-12 sm:h-14 bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden focus-within:bg-white focus-within:border-rose-500 focus-within:ring-4 focus-within:ring-rose-500/10 transition-all">
+                        <div className="flex h-11 sm:h-12 bg-white border border-slate-200 rounded-xl overflow-hidden focus-within:border-rose-500 focus-within:ring-2 focus-within:ring-rose-500/10 transition-all">
 
-                          <div className="w-[70px] sm:w-[82px] shrink-0 flex items-center justify-center border-r border-slate-200 text-xs sm:text-sm font-black text-slate-600">
-                            +91
+                          <div className="w-[58px] shrink-0 flex items-center justify-center gap-1.5 border-r border-slate-200 text-xs font-semibold text-slate-500">
+                            <Smartphone className="w-3.5 h-3.5" />
+                            <span>+91</span>
                           </div>
 
                           <input
@@ -737,13 +736,13 @@ export const LoginPage: React.FC = () => {
                                 e.target.value.replace(/\D/g, '')
                               )
                             }
-                            placeholder="Enter 10-digit number"
-                            className="flex-1 min-w-0 px-3 sm:px-4 bg-transparent text-sm sm:text-base font-bold text-slate-900 outline-none placeholder:text-slate-400 font-mono"
+                            placeholder={isMarathi ? 'मोबाईल नंबर टाका' : 'Enter your mobile number'}
+                            className="flex-1 min-w-0 px-3 bg-transparent text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400"
                           />
 
                         </div>
 
-                        <div className="flex items-center gap-1.5 mt-2 text-[10px] sm:text-xs text-slate-400">
+                        <div className="hidden">
                           <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
 
                           <span>
@@ -762,16 +761,14 @@ export const LoginPage: React.FC = () => {
                           isLoading ||
                           phoneNumber.replace(/\D/g, '').length < 10
                         }
-                        className="group w-full h-12 sm:h-14 bg-[#ff0038] hover:bg-[#e80034] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-500/20 transition-all active:scale-[0.99]"
+                        className="group w-full h-11 sm:h-12 bg-[#ff0038] hover:bg-[#e80034] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.99]"
                       >
-                        <Smartphone className="w-4 h-4" />
-
                         <span>
                           {isLoading
                             ? 'Sending OTP...'
                             : isMarathi
-                              ? 'ओटीपी पाठवा'
-                              : 'Send OTP'}
+                              ? 'पुढे सुरू ठेवा'
+                              : 'Continue'}
                         </span>
 
                         {!isLoading && (
@@ -780,7 +777,7 @@ export const LoginPage: React.FC = () => {
                       </button>
 
                       {/* Benefits */}
-                      <div className="pt-2">
+                      <div className="hidden">
 
                         <div className="grid grid-cols-3 gap-2 sm:gap-3">
 
@@ -819,7 +816,7 @@ export const LoginPage: React.FC = () => {
                       </div>
 
                       {/* Privacy */}
-                      <div className="rounded-2xl bg-rose-50/70 border border-rose-100 p-3 sm:p-3.5 flex items-center gap-3">
+                      <div className="hidden">
 
                         <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shrink-0">
                           <ShieldCheck className="w-4.5 h-4.5 text-[#ff0038]" />
@@ -1003,7 +1000,7 @@ export const LoginPage: React.FC = () => {
               </div>
 
               {/* Bottom Security Text */}
-              <div className="shrink-0 flex items-center justify-center gap-1.5 mt-3 sm:mt-4 text-[9px] sm:text-[10px] text-slate-400">
+              <div className="hidden">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
                 <span>100% Secure & Hassle Free</span>
               </div>

@@ -181,7 +181,7 @@ interface AppContextType {
 
   // Products
   products: Product[];
-  addProduct: (product: Partial<Product>) => Product;
+  addProduct: (product: Partial<Product>) => Promise<boolean>;
   updateProduct: (productId: string, updatedData: Partial<Product>) => void;
   deleteProduct: (productId: string) => void;
 
@@ -775,7 +775,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // ================================================================
   // Product CRUD Handlers
   // ================================================================
-  const addProduct = (prodData: Partial<Product>): Product => {
+  const addProduct = async (prodData: Partial<Product>): Promise<boolean> => {
     const newId = prodData.id || `prod-${Date.now()}`;
 
     const imagePath = prodData.image
@@ -865,8 +865,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         prodData.isBestSeller !== undefined ? prodData.isBestSeller : true
     };
 
-    setProducts(prev => [newProduct, ...prev]);
-
     const payload = {
       ...newProduct,
       image: imagePath || '',
@@ -874,38 +872,56 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         galleryPaths.length > 0 ? galleryPaths : imagePath ? [imagePath] : []
     };
 
-    void apiFetch('/api/products', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-      .then(async res => {
-        if (!res.ok) {
-          let message = 'Failed to create product';
-          try {
-            const data = await res.json();
-            message = data?.error || data?.message || message;
-          } catch {
-            // Ignore non-JSON error responses.
-          }
-          throw new Error(message);
-        }
-      })
-      .catch(err => {
-        console.error('Product create API error:', err);
-        setProducts(prev => prev.filter(p => p.id !== newProduct.id));
-        showToast(
-          err instanceof Error ? err.message : 'Failed to create product',
-          'error'
-        );
+    try {
+      const response = await apiFetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
 
-    showToast(
-      `Product "${newProduct.name}" published successfully!`,
-      'success'
-    );
+      if (!response.ok) {
+        let message = 'Failed to create product';
+        try {
+          const data = await response.json();
+          message = data?.error || data?.message || message;
+        } catch {
+          // Ignore non-JSON error responses.
+        }
+        throw new Error(message);
+      }
 
-    return newProduct;
+      const data = await response.json();
+      const savedProduct = data?.product as Product | undefined;
+      if (!savedProduct) {
+        throw new Error('Product was created but the server did not return the saved product.');
+      }
+      if (
+        newProduct.bulkPrice200 !== undefined &&
+        Number(savedProduct.bulkPrice200) !== Number(newProduct.bulkPrice200)
+      ) {
+        throw new Error('The server did not save the 200-piece price. Check that the production migration has been applied.');
+      }
+
+      const persistedProduct: Product = {
+        ...newProduct,
+        ...savedProduct,
+        image: savedProduct.image ? getFullImageUrl(savedProduct.image) : displayImage,
+        galleryImages: Array.isArray(savedProduct.galleryImages)
+          ? savedProduct.galleryImages.map(getFullImageUrl)
+          : displayGallery
+      };
+
+      setProducts(prev => [persistedProduct, ...prev.filter(product => product.id !== persistedProduct.id)]);
+      showToast(`Product "${persistedProduct.name}" published successfully!`, 'success');
+      return true;
+    } catch (err) {
+      console.error('Product create API error:', err);
+      showToast(
+        err instanceof Error ? err.message : 'Failed to create product',
+        'error'
+      );
+      return false;
+    }
   };
 
   const updateProduct = async (

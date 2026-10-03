@@ -61,7 +61,6 @@ async function startServer() {
       const isSameOrigin = !!origin && origin === `${req.protocol}://${req.get('host')}`;
       const isAllowed = !origin || isSameOrigin || allowedOrigins.includes(origin);
 
-      // Unknown origins are refused quietly (no CORS headers, no error stack trace).
       callback(null, {
         origin: isAllowed,
         credentials: true,

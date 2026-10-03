@@ -10,7 +10,6 @@ import {
   Linkedin,
   Youtube
 } from 'lucide-react';
-import { ProprintLogo } from './ProprintLogo';
 import { useApp } from '../context/AppContext';
 import { openDirectWhatsApp } from '../utils/whatsapp';
 
@@ -30,8 +29,13 @@ export const Footer: React.FC = () => {
           
           {/* Column 1: Brand Info (span 4 on desktop) */}
           <div className="lg:col-span-4 space-y-4">
-            <Link to="/" className="inline-block" aria-label="Proprint Home">
-              <ProprintLogo size="md" variant="dark" showTagline={true} />
+            <Link to="/" className="inline-flex flex-col items-start" aria-label="Proprint Home">
+              <span className="mb-1 h-0.5 w-20 rounded-full bg-[#E90046]" />
+              <span className="text-2xl font-black leading-none">
+                <span className="text-slate-900">pro</span>
+                <span className="text-[#E90046]">print</span>
+              </span>
+              <span className="mt-1 text-[8px] tracking-[2px] text-slate-500">FOR ALL PRINTING SOLUTIONS</span>
             </Link>
 
             <p className="text-xs sm:text-[13px] text-slate-500 leading-relaxed max-w-sm">
@@ -236,10 +240,10 @@ export const Footer: React.FC = () => {
       </div>
 
       {/* 2. BOTTOM COPYRIGHT BAR (Deep Dark Navy #080D1C matching Reference Design) */}
-      <div className="w-full bg-[#080D1C] text-slate-400 border-t border-slate-800 text-xs py-4 px-4 sm:px-6 lg:px-8">
+      <div className="w-full border-t border-slate-200 bg-white px-4 py-4 text-xs text-slate-500 sm:px-6 lg:px-8">
         <div className="w-full max-w-[1440px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5">
           <p>© 2025 Proprint. All rights reserved.</p>
-          <div className="flex items-center gap-2 font-medium tracking-wider text-slate-300 uppercase text-[11px]">
+          <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-slate-600">
             <span>Print</span>
             <span className="text-[#E90046]">•</span>
             <span>Explore</span>

@@ -432,7 +432,7 @@ export const AdminPage: React.FC = () => {
   };
 
   // Save Product (Create or Update)
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prodName.trim()) {
       showToast('Please enter a product name', 'error');
@@ -443,7 +443,7 @@ export const AdminPage: React.FC = () => {
     const mainImage = uploadedImages[0]?.preview || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80';
 
     if (editingProduct) {
-      updateProduct(editingProduct.id, {
+      const updated = await updateProduct(editingProduct.id, {
         name: prodName,
         categoryId: prodCategory,
         category: categories.find(c => c.id === prodCategory)?.name || 'Print Item',
@@ -453,9 +453,9 @@ export const AdminPage: React.FC = () => {
         image: mainImage,
         galleryImages: uploadedImages.map(img => img.preview)
       });
-      showToast(`Updated product: ${prodName}`, 'success');
+      if (!updated) return;
     } else {
-      addProduct({
+      const created = await addProduct({
         name: prodName,
         categoryId: prodCategory,
         category: categories.find(c => c.id === prodCategory)?.name || 'Print Item',
@@ -465,6 +465,7 @@ export const AdminPage: React.FC = () => {
         image: mainImage,
         galleryImages: uploadedImages.map(img => img.preview)
       });
+      if (!created) return;
     }
 
     setIsAddProductModalOpen(false);

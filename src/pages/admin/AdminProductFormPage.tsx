@@ -32,6 +32,7 @@ export const AdminProductFormPage: React.FC = () => {
 
   // Active sub-tab in form for clean organization
   const [activeSection, setActiveSection] = useState<'details' | 'finishes' | 'sizes' | 'pricing'>('details');
+  const [isSaving, setIsSaving] = useState(false);
 
   // Form State
   const [name, setName] = useState(existingProduct?.name || '');
@@ -342,8 +343,9 @@ export const AdminProductFormPage: React.FC = () => {
   };
 
   // Form Submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
 
     if (!name.trim() || name.trim().length < 3) {
       showToast('Validation Error: Product name must be at least 3 characters', 'error');
@@ -423,17 +425,25 @@ export const AdminProductFormPage: React.FC = () => {
     };
 
     if (isEditing && existingProduct) {
-      updateProduct(existingProduct.id, productPayload);
-      showToast(`Product "${name}" updated with real photos & specs!`, 'success');
-      navigate(`/product/${existingProduct.id}`);
+      setIsSaving(true);
+      try {
+        const updated = await updateProduct(existingProduct.id, productPayload);
+        if (updated) navigate('/admin/products', { replace: true });
+      } finally {
+        setIsSaving(false);
+      }
     } else {
-      addProduct({
-        ...productPayload,
-        rating: 5.0,
-        reviewsCount: 1,
-      } as any);
-      showToast(`New Product "${name}" published successfully!`, 'success');
-      navigate('/admin/products');
+      setIsSaving(true);
+      try {
+        const created = await addProduct({
+          ...productPayload,
+          rating: 5.0,
+          reviewsCount: 1,
+        } as any);
+        if (created) navigate('/admin/products', { replace: true });
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -486,10 +496,11 @@ export const AdminProductFormPage: React.FC = () => {
           </Link>
           <button
             onClick={handleSubmit}
-            className="px-5 py-2 bg-[#FF0038] hover:bg-rose-600 active:scale-98 text-white font-extrabold rounded-xl text-xs shadow-md shadow-rose-600/30 transition-all cursor-pointer flex items-center gap-1.5"
+            disabled={isSaving}
+            className="px-5 py-2 bg-[#FF0038] hover:bg-rose-600 disabled:opacity-60 disabled:cursor-wait active:scale-98 text-white font-extrabold rounded-xl text-xs shadow-md shadow-rose-600/30 transition-all cursor-pointer flex items-center gap-1.5"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>{isEditing ? 'Save Changes & Update Store' : 'Publish Product'}</span>
+            <span>{isSaving ? 'Saving...' : isEditing ? 'Save Changes & Update Store' : 'Publish Product'}</span>
           </button>
         </div>
       </div>
@@ -1309,10 +1320,11 @@ export const AdminProductFormPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleSubmit}
-                className="px-6 py-2.5 bg-[#FF0038] hover:bg-rose-600 text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-md shadow-rose-600/30 transition-all cursor-pointer active:scale-98 flex items-center gap-2"
+                disabled={isSaving}
+                className="px-6 py-2.5 bg-[#FF0038] hover:bg-rose-600 disabled:opacity-60 disabled:cursor-wait text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-md shadow-rose-600/30 transition-all cursor-pointer active:scale-98 flex items-center gap-2"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>{isEditing ? 'Save Changes & Update Store' : 'Publish Product'}</span>
+                <span>{isSaving ? 'Saving...' : isEditing ? 'Save Changes & Update Store' : 'Publish Product'}</span>
               </button>
             </div>
 

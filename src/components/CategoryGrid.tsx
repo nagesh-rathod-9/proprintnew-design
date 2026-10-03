@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ChevronRight, Package } from 'lucide-react';
+import { ArrowRight, Package } from 'lucide-react';
 import { Category, CategoryId } from '../types';
 import { apiFetch, getFullImageUrl, useApp } from '../context/AppContext';
 
@@ -14,7 +14,6 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({
   const { isMarathi, setSelectedCategory } = useApp();
   const [apiCategories, setApiCategories] = useState<Category[] | null>(null);
   const navigate = useNavigate();
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     apiFetch('/api/categories')
@@ -40,18 +39,6 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({
         setSelectedCategory(catId as any);
       }
       navigate(`/products?category=${catId}`);
-    }
-  };
-
-  const scrollRight = () => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: 300, behavior: 'smooth' });
-    }
-  };
-
-  const scrollLeft = () => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: -300, behavior: 'smooth' });
     }
   };
 
@@ -83,19 +70,12 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({
         </button>
       </div>
 
-      {/* Cards Container with Right Chevron Arrow Button */}
-      <div className="relative group/scroll">
-        
-        {/* Horizontal Scroll / Grid */}
-        <div 
-          ref={scrollContainerRef}
-          className="mobile-horizontal-scroll flex items-stretch gap-3 sm:gap-4 overflow-x-auto pb-3 pt-1 scrollbar-none scroll-smooth snap-x snap-mandatory"
-        >
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 items-stretch gap-3 sm:gap-4 pb-1 pt-1">
           {(apiCategories || []).map((item) => (
             <button
               key={item.id}
               onClick={() => handleCategoryClick(item.id)}
-              className="flex-none w-[150px] sm:w-[170px] md:w-[185px] snap-start bg-white rounded-xl border border-[#E7EAF0] p-3 sm:p-4 text-center hover:border-[#E90046] hover:shadow-md transition-all cursor-pointer flex flex-col items-center justify-between group"
+              className="min-w-0 bg-white rounded-xl border border-[#E7EAF0] p-3 sm:p-4 text-center hover:border-[#E90046] hover:shadow-md transition-all cursor-pointer flex flex-col items-center justify-between group"
             >
               {/* Image Box */}
               <div className="w-full aspect-[4/3] rounded-lg overflow-hidden bg-slate-50 mb-3 flex items-center justify-center border border-slate-100">
@@ -122,17 +102,6 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({
               </div>
             </button>
           ))}
-        </div>
-
-        {/* Right Scroll Arrow Button matching Reference Design */}
-        <button
-          onClick={scrollRight}
-          className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white shadow-lg border border-slate-200 items-center justify-center text-slate-700 hover:text-[#E90046] hover:border-[#E90046] transition-all cursor-pointer z-20"
-          aria-label="Scroll Categories Right"
-        >
-          <ChevronRight className="w-5 h-5 stroke-[2.2]" />
-        </button>
-
       </div>
 
     </section>
