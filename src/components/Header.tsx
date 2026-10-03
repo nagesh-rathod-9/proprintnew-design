@@ -297,6 +297,13 @@ export const Header: React.FC<HeaderProps> = ({
                         >
                           <User className="w-4 h-4 text-[#E90046]" />
                           <span>{isMarathi ? 'माझी प्रोफाइल' : 'My Profile'}</span>
+                        </Link>
+                        <Link
+                          to="/orders"
+                          onClick={() => setUserDropdownOpen(false)}
+                          className="flex items-center gap-2 px-3.5 py-2 text-slate-200 hover:text-white hover:bg-slate-800/80 transition-colors"
+                        >
+                          <Package className="w-4 h-4 text-amber-400" />
                           <span>{isMarathi ? 'माझ्या ऑर्डर्स' : 'My Orders'}</span>
                         </Link>
                         {currentUser.role === 'admin' && (
