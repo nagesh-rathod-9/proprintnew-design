@@ -164,15 +164,15 @@ export const BestSellingGrid: React.FC<BestSellingGridProps> = ({
         </button>
       </div>
 
-      {/* 6 Products Grid: strictly 1 row on mobile with horizontal scroll, responsive grid on md/lg */}
-      <div className="mobile-horizontal-scroll flex md:grid overflow-x-auto md:overflow-visible md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-5 pb-2 md:pb-0 scrollbar-none no-scrollbar snap-x">
+      {/* Products flow vertically on mobile, then use more columns as space allows. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-5">
         {(apiProducts || []).map((product) => {
           const isWishlisted = (wishlistIds || []).includes(product.id);
 
           return (
             <div
               key={product.id}
-              className="flex-none w-full sm:w-[190px] md:w-auto snap-start bg-white rounded-xl border border-[#E7EAF0] p-3 sm:p-3.5 flex flex-col justify-between hover:border-slate-300 hover:shadow-md transition-all group"
+              className="w-full bg-white rounded-xl border border-[#E7EAF0] p-3 sm:p-3.5 flex flex-col justify-between hover:border-slate-300 hover:shadow-md transition-all group"
             >
               <div>
                 {/* Image Container with Top-Right Heart Wishlist Button */}
