@@ -399,7 +399,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* All Categories Button | Products | Services | Portfolio | ...*/}
       {/* ============================================================ */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 hidden h-[72px] items-center justify-center lg:flex">
-        <div className="pointer-events-auto flex h-full w-full max-w-[1440px] items-center justify-center px-4 sm:px-6 lg:px-8">
+        <div className="pointer-events-none flex h-full w-full max-w-[1440px] items-center justify-center px-4 sm:px-6 lg:px-8">
           
           {/* Left: Solid Pink "All Categories" Button with Dropdown */}
           <div ref={categoriesRef} className="hidden">
@@ -488,7 +488,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Center Navigation Links: Products ⌵ | Services ⌵ | Design Portfolio | Business Solutions | About Us | Support */}
-          <nav className="flex items-center gap-5 xl:gap-7 text-[12px] xl:text-[13px] font-semibold text-white">
+          <nav className="pointer-events-auto flex items-center gap-5 xl:gap-7 text-[12px] xl:text-[13px] font-semibold text-white">
             
             {/* Products Dropdown */}
               <div
